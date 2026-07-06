@@ -85,10 +85,18 @@ IndexedDB db `hypershelf`, version **4**:
 
 While editing via Cowork, large file writes to the vault got **silently truncated at ~40KB** (a Cowork mount sync issue — the app file died mid-script and the whole site went dead until repaired). Claude Code writes directly so this specific failure shouldn't recur, but keep the habit: **after any write, verify the file still ends with `</html>` and the JS parses** (e.g. extract `<script>` body → `node --check`). A broken write here bricks the user's daily tool.
 
-## Deployment plan (not done yet)
+## Deployment (LIVE as of July 6 2026)
 
-- Grey will create a GitHub repo; deploy = publish `Hypershelf.html` as `index.html` on Vercel (static, zero config). Nothing else needed.
-- Remind him: the deployed site starts with an empty shelf (separate origin) — use library backup to migrate, or build URL-hash sharing.
+- **Live site:** https://hypershelf.vercel.app · **Repo:** https://github.com/greygolus/Hypershelf
+- Repo root = this folder (`.gitignore` excludes `.claude/`, the project home note, `.vercel`, `.env*`). `Hypershelf.html` stays the only source file; `vercel.json` rewrites `/` → `/Hypershelf.html` (no rename, no duplication).
+- Vercel project `hypershelf` (scope `greygolus-projects`), **git-connected**: pushing to `main` auto-deploys production. Manual deploy: `npx vercel deploy --prod` from this folder.
+- The deployed site has its own origin → its own empty shelf. Migrate files with Export/Import library backup.
+
+## Branding (v1.5, July 6 2026)
+
+- Restyled to match **greygolus.com**: black `#000000` bg, silver `#ECEEED` text, cyan `#54C8FF` accent (`--accent2:#2493DC` gradient stop), near-black panels, mono uppercase section labels, faint 60px grid + cyan radial glow (`body::before`), cyan selection, glow on card hover. Light theme = silver bg `#ECEEED`, near-black text, deeper cyan `#0e87cc` (white text on accent surfaces vs black text in dark mode).
+- **Logo** (neon folder PNG) embedded ONCE as base64 in the sidebar `<img class="mark">` (~41KB, 128px); the favicon `<link id="favicon">` is set from that img's src at init — don't add a second copy.
+- Cyan literals also live in: edit-mode outline styles (renderFrame injected CSS), `#codeBack .hl`, and the WELCOME seed file (restyled dark to match brand).
 
 ## Agreed feature roadmap (from discussion; not yet prioritized by Grey)
 
