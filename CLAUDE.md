@@ -91,6 +91,7 @@ While editing via Cowork, large file writes to the vault got **silently truncate
 - Repo root = this folder (`.gitignore` excludes `.claude/`, the project home note, `.vercel`, `.env*`). `Hypershelf.html` stays the only source file; `vercel.json` rewrites `/` → `/Hypershelf.html` (no rename, no duplication).
 - Vercel project `hypershelf` (scope `greygolus-projects`), **git-connected**: pushing to `main` auto-deploys production. Manual deploy: `npx vercel deploy --prod` from this folder.
 - The deployed site has its own origin → its own empty shelf. Migrate files with Export/Import library backup.
+- **Web Analytics**: the site injects `/_vercel/insights/script.js` at init, but ONLY when `location.hostname` ends with `.vercel.app` — local copies stay dependency-free. Enabling analytics itself is dashboard-only (no public API): Vercel dashboard → hypershelf → Analytics → Enable, then redeploy (`npx vercel redeploy` or any push).
 
 ## Branding (v1.5, July 6 2026)
 
