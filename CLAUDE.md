@@ -11,7 +11,18 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - No backend. All user data stays on the user's machine.
 - `Hypershelf.html` is the only source file. The same file doubles as the deployable `index.html`.
 
-## Current state (v1.5, working)
+## Current state (v1.6, working)
+
+**Added in v1.6 (Claude Code, July 6 2026) — multi-file disk projects:**
+- **Disk mode now handles real sites** (HTML + separate CSS/JS files). On open, `bundleDiskHtml` resolves relative `<link rel=stylesheet>` and external `<script src>` references against the connected folder (subfolders + `../` within root; external URLs skipped) and inlines them as `<style data-hs-src="path">` / `<script data-hs-src="path">` blocks. The WHOLE editor then works on external CSS for free: Edit mode, 🎨 Colors, scope-picker rules, code panel, undo, versions, AI round-trip.
+- **Asset cache**: relative images/fonts/media (`src=` and CSS `url()`) are preloaded as data URIs (3MB/file cap) and substituted at RENDER time only (`applyAssetCache` in renderFrame + preview iframes) — the working document keeps clean paths.
+- **Multi-file save** (`saveDiskProject`): each `data-hs-src` block writes back to its own file (skipped if unchanged), the original `<link>`/`<script src>` tags are restored in the HTML, and the HTML file is written. Adding a NEW `<style data-hs-src="new.css">` block in code creates that file on save. Script bodies containing `</`+`script` are escaped as `<\/script` at bundle time and unescaped at save.
+- **Recursive folder listing**: `listDisk` walks subfolders (depth ≤3, skips node_modules/.git/.next/dist/build/.vercel); disk file names are folder-relative paths.
+- **Code panel file-jump** dropdown (`#fileJump`, visible only for bundled projects) scrolls to a bundled file's block. Disk thumbnails bundle CSS too (never scripts).
+- **AI scaffold** gains a rule to preserve `data-hs-src` blocks when the open file is a bundled project.
+- ⚠ **Single-file-app trap (bit us in this build):** any literal `</script` sequence inside the app's own JS (even in a string) TERMINATES the app's script element — the rest of the app renders as page text with NO console error. Always write it split (`'</'+'script'`). The verify step now checks `indexOf('</script')` from the script start equals the real closing tag position — keep using that check after every edit.
+
+## v1.5 state
 
 **Added in v1.5 (Claude Code, July 6 2026):**
 - **🎨 Colors panel — Back/Reset + hover preview (added same day):** panel has its own ↶ Back (steps through color/font changes one at a time, `themeHist` stack) and Reset all (returns to `themeOrig`, captured when the panel was opened) — both also feed the global undo stack. Clicking a swatch row expands a 24-tile suggestion palette (12-hue wheel, light/dark ramp of the current color, neutrals); **hovering a tile live-previews** the whole file (120ms delay, no dirty flag, no history entry), mouse-out reverts, click commits. Un-committed previews are dropped on panel close. Global undo/version-restore/AI-accept now **rebase the panel** (`renderThemePanel` re-scan) so a stale `themeBase` can't resurrect undone changes.

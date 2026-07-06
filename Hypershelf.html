@@ -139,6 +139,7 @@
   #codeBack{color:transparent;pointer-events:none;overflow:hidden;background:transparent;z-index:0}
   #codeBack .hl{background:rgba(84,200,255,.22);box-shadow:0 0 0 1px rgba(84,200,255,.45);border-radius:3px}
   #codeTa{background:transparent;color:#dbe2f0;resize:none;outline:none;z-index:1}
+  #fileJump{position:absolute;top:8px;right:16px;z-index:3;font-size:11px;padding:3px 6px;opacity:.92;max-width:45%}
 
   /* ---------- Modal ---------- */
   #modalWrap{position:fixed;inset:0;background:rgba(5,7,12,.65);display:none;
@@ -347,6 +348,7 @@
       <div id="codeResizer" class="off" title="Drag to resize"></div>
       <div id="codePanel" class="off">
         <div id="codeWrap">
+          <select id="fileJump" class="off" title="Jump to a bundled file"></select>
           <pre id="codeBack" aria-hidden="true"></pre>
           <textarea id="codeTa" spellcheck="false" wrap="off"></textarea>
         </div>
@@ -630,10 +632,120 @@ async function listDisk(){
   state.disk.files=[];
   if(!state.disk.handle)return;
   try{
-    for await(const h of state.disk.handle.values())
-      if(h.kind==='file'&&/\.html?$/i.test(h.name))state.disk.files.push({name:h.name,handle:h});
+    async function walk(dir,prefix,depth){
+      for await(const h of dir.values()){
+        if(h.kind==='file'&&/\.html?$/i.test(h.name))state.disk.files.push({name:prefix+h.name,handle:h});
+        else if(h.kind==='directory'&&depth<3&&!/^(node_modules|\.git|\.next|dist|build|\.vercel)$/i.test(h.name))
+          await walk(h,prefix+h.name+'/',depth+1);
+      }
+    }
+    await walk(state.disk.handle,'',0);
     state.disk.files.sort((a,b)=>a.name.localeCompare(b.name));
   }catch{toast('Could not read the folder')}
+}
+
+/* ---------- multi-file projects: bundle linked css/js so the whole editor works on them ---------- */
+function resolveRel(base,ref){ /* → folder-relative path, or null for external/unreachable */
+  if(!ref||/^(https?:)?\/\/|^[a-z]+:|^#|^\//i.test(ref))return null;
+  const parts=base?base.split('/'):[];
+  for(const s of ref.split('/')){
+    if(s==='.'||s==='')continue;
+    if(s==='..'){if(!parts.length)return null;parts.pop()}
+    else parts.push(s);
+  }
+  return parts.join('/')||null;
+}
+async function getFileByPath(root,path,create){
+  const parts=path.split('/'),file=parts.pop();
+  let dir=root;
+  for(const p of parts)dir=await dir.getDirectoryHandle(p,{create:!!create});
+  return dir.getFileHandle(file,{create:!!create});
+}
+const attrVal=(tag,name)=>{
+  const m=tag.match(new RegExp(name+'\\s*=\\s*("([^"]*)"|\'([^\']*)\'|([^\\s>]+))','i'));
+  return m?(m[2]??m[3]??m[4]):null;
+};
+/* replace <link rel=stylesheet> and external <script src> with inline blocks tagged data-hs-src */
+async function bundleDiskHtml(root,relPath,raw,opts={}){
+  const base=relPath.includes('/')?relPath.slice(0,relPath.lastIndexOf('/')):'';
+  const assets={},warns=[];
+  let html=raw;
+  for(const tag of [...raw.matchAll(/<link\b[^>]*>/gi)].map(x=>x[0])){
+    if(!/rel\s*=\s*["']?stylesheet/i.test(tag))continue;
+    const ref=(attrVal(tag,'href')||'').split(/[?#]/)[0];
+    const path=resolveRel(base,ref);if(!path)continue;
+    try{
+      const text=await(await(await getFileByPath(root,path)).getFile()).text();
+      assets[path]={origTag:tag,kind:'css',orig:text};
+      html=html.replace(tag,`<style data-hs-src="${path}">\n${text}\n</style>`);
+    }catch{warns.push(ref)}
+  }
+  if(opts.withScripts!==false){
+    for(const tag of [...raw.matchAll(/<script\b[^>]*\bsrc\s*=\s*[^>]*>\s*<\/script>/gi)].map(x=>x[0])){
+      const ref=(attrVal(tag,'src')||'').split(/[?#]/)[0];
+      const path=resolveRel(base,ref);if(!path)continue;
+      try{
+        const text=await(await(await getFileByPath(root,path)).getFile()).text();
+        assets[path]={origTag:tag,kind:'js',orig:text};
+        const open=tag.match(/<script\b[^>]*?>/i)[0]
+          .replace(/\ssrc\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i,'')
+          .replace(/>$/,` data-hs-src="${path}">`);
+        html=html.replace(tag,open+'\n'+text.replace(/<\/script/gi,'<\\/script')+'\n</'+'script>');
+      }catch{warns.push(ref)}
+    }
+  }
+  return{html,assets,warns,base};
+}
+/* images/fonts referenced with relative paths → data URIs, used at RENDER time only
+   (the working document keeps the original paths, so files stay clean) */
+async function preloadDiskAssets(root,base,html){
+  const cache=new Map(),refs=new Set();
+  for(const m of html.matchAll(/<(?:img|source|audio|video)\b[^>]*\bsrc\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi))refs.add(m[2]??m[3]??m[4]);
+  for(const m of html.matchAll(/url\(\s*['"]?([^'")]+?)['"]?\s*\)/gi))refs.add(m[1]);
+  for(const ref of refs){
+    const clean=ref.split(/[?#]/)[0];
+    const path=resolveRel(base,clean);
+    if(!path||cache.has(ref))continue;
+    if(!/\.(png|jpe?g|gif|webp|svg|ico|bmp|avif|woff2?|ttf|otf|mp3|mp4|webm)$/i.test(path))continue;
+    try{
+      const f=await(await getFileByPath(root,path)).getFile();
+      if(f.size>3*1024*1024)continue;
+      cache.set(ref,await new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(f)}));
+    }catch{}
+  }
+  return cache;
+}
+function applyAssetCache(html){
+  const cache=state.cur&&state.cur.assetCache;
+  if(!cache||!cache.size)return html;
+  for(const[ref,uri]of cache){
+    const e=ref.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    html=html.replace(new RegExp('(src\\s*=\\s*["\'])'+e+'(["\'])','gi'),'$1'+uri+'$2');
+    html=html.replace(new RegExp('(url\\(\\s*["\']?)'+e+'(["\']?\\s*\\))','gi'),'$1'+uri+'$2');
+  }
+  return html;
+}
+/* Save for disk projects: css/js blocks → their own files (only if changed), tags restored in the html */
+async function saveDiskProject(cur,html){
+  const root=state.disk.handle,assets=cur.assets||{},writes=[];
+  html=html.replace(/<style\b[^>]*\bdata-hs-src="([^"]+)"[^>]*>\n?([\s\S]*?)\n?<\/style>/gi,(m,path,css)=>{
+    writes.push({path,text:css});
+    return(assets[path]&&assets[path].origTag)||`<link rel="stylesheet" href="${path}">`;
+  });
+  html=html.replace(/<script\b[^>]*\bdata-hs-src="([^"]+)"[^>]*>\n?([\s\S]*?)\n?<\/script>/gi,(m,path,js)=>{
+    writes.push({path,text:js.replace(/<\\\/script/g,'</'+'script')});
+    return(assets[path]&&assets[path].origTag)||`<script src="${path}"></`+`script>`;
+  });
+  let n=0;
+  for(const item of writes){
+    if(assets[item.path]&&assets[item.path].orig===item.text)continue;
+    const fh=await getFileByPath(root,item.path,true);
+    const w=await fh.createWritable();await w.write(item.text);await w.close();
+    (assets[item.path]||(assets[item.path]={kind:'css'})).orig=item.text;
+    n++;
+  }
+  const w=await cur.handle.createWritable();await w.write(html);await w.close();
+  return n+1;
 }
 async function disconnectFolder(){
   state.disk={handle:null,name:'',files:[],needsPerm:false};state.filter.disk=false;
@@ -666,8 +778,11 @@ function renderDiskGrid(){
       (async()=>{try{
         const file=await f.handle.getFile();
         en.target.querySelector('.fdate').textContent=fmtDate(file.lastModified);
+        let src=await file.text();
+        /* thumbnails get the linked css too (scripts never run in thumbs) */
+        try{src=(await bundleDiskHtml(state.disk.handle,f.name,src,{withScripts:false})).html}catch{}
         const ifr=document.createElement('iframe');
-        ifr.setAttribute('sandbox','');ifr.loading='lazy';ifr.srcdoc=await file.text();
+        ifr.setAttribute('sandbox','');ifr.loading='lazy';ifr.srcdoc=src;
         const th=en.target.querySelector('.thumb');th.innerHTML='';th.appendChild(ifr);
       }catch{}})();
     }},{root:grid,rootMargin:'200px'});
@@ -701,12 +816,20 @@ function openDiskMenu(btn,f){
 async function openDiskFile(f){
   try{
     const file=await f.handle.getFile();
-    const html=await file.text();
-    state.cur={id:null,disk:true,handle:f.handle,name:f.name,html};
+    const raw=await file.text();
+    let html=raw,assets={},assetCache=new Map();
+    try{
+      const b=await bundleDiskHtml(state.disk.handle,f.name,raw);
+      html=b.html;assets=b.assets;
+      assetCache=await preloadDiskAssets(state.disk.handle,b.base,html);
+      if(b.warns.length)toast('Could not load linked file(s): '+b.warns.slice(0,3).join(', '));
+    }catch{}
+    state.cur={id:null,disk:true,handle:f.handle,name:f.name,html,assets,assetCache};
     state.srcDoc=null;state.selEl=null;setDirty(false);
     state.mmode='interact';state.codeOpen=false;
     $('#edName').value=f.name;$('#edName').readOnly=true;
-    $('#edSub').textContent='💻 editing the real file on disk';
+    const na=Object.keys(assets).length;
+    $('#edSub').textContent='💻 editing real files on disk'+(na?` · ${na} linked file${na>1?'s':''} bundled`:'');
     $('#codePanel').classList.add('off');$('#codeResizer').classList.add('off');
     $('#btnCode').classList.remove('primary');closeThemePanel();
     $('#libView').style.display='none';$('#edView').classList.add('show');
@@ -874,11 +997,10 @@ async function saveCur(){
   /* capture locals up front — state.cur can be nulled by navigation while we await */
   const key=verKey(),html=state.cur.html;
   if(state.cur.disk){
-    const handle=state.cur.handle;
+    const cur=state.cur;
     try{
-      const w=await handle.createWritable();
-      await w.write(html);await w.close();
-      setDirty(false);toast('Saved to disk');
+      const n=await saveDiskProject(cur,html);
+      setDirty(false);toast(n>1?`Saved ${n} files to disk`:'Saved to disk');
       pushVersion(key,html);idb.del('drafts',key).catch(()=>{});
     }catch(err){toast('Save failed: '+err.message)}
     return;
@@ -927,7 +1049,7 @@ function renderFrame(){
   if(state.mmode==='interact'){
     fr.setAttribute('sandbox','allow-scripts allow-modals allow-forms allow-popups');
     wrap.appendChild(fr);
-    fr.srcdoc=state.cur.html;
+    fr.srcdoc=applyAssetCache(state.cur.html);
   }else{
     state.srcDoc=new DOMParser().parseFromString(state.cur.html,'text/html');
     let i=0;
@@ -945,7 +1067,7 @@ function renderFrame(){
     disp.head.appendChild(st);
     fr.onload=()=>attachEditHandlers(fr.contentDocument);
     wrap.appendChild(fr);
-    fr.srcdoc='<!DOCTYPE html>\n'+disp.documentElement.outerHTML;
+    fr.srcdoc=applyAssetCache('<!DOCTYPE html>\n'+disp.documentElement.outerHTML);
     renderInspector(null);
   }
   applyPreviewWidth();
@@ -1107,6 +1229,22 @@ $('#btnCode').onclick=()=>{
   $('#btnCode').classList.toggle('primary',state.codeOpen);
   if(state.codeOpen){flushSerialize();$('#codeTa').value=state.cur.html;hlLine=-1;renderBackdrop();
     if(state.selEl)jumpToEl(state.selEl)}
+  updateFileJump();
+};
+/* multi-file disk projects: dropdown to jump to a bundled css/js block in the code */
+function updateFileJump(){
+  const sel=$('#fileJump');
+  const assets=state.cur&&state.cur.assets?Object.keys(state.cur.assets):[];
+  if(!state.codeOpen||!assets.length){sel.classList.add('off');return}
+  sel.classList.remove('off');
+  sel.innerHTML='<option value="">'+esc(state.cur.name)+' (html)</option>'+
+    assets.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('');
+}
+$('#fileJump').onchange=()=>{
+  const p=$('#fileJump').value;
+  if(!p){setCodeHighlight(0,true);return}
+  const i=$('#codeTa').value.split('\n').findIndex(l=>l.includes('data-hs-src="'+p+'"'));
+  if(i>=0)setCodeHighlight(i,true);
 };
 function refreshCodeText(){
   if(!state.codeOpen)return;
@@ -1370,7 +1508,7 @@ $('#btnHistory').onclick=async()=>{
   $$('#modal .vprev').forEach(b=>b.onclick=()=>{
     const v=vers.find(x=>x.vid===b.dataset.vid);if(!v)return;
     const pane=$('#vPane');pane.classList.remove('asdiff');pane.innerHTML='';
-    const ifr=document.createElement('iframe');ifr.setAttribute('sandbox','');ifr.srcdoc=v.html;
+    const ifr=document.createElement('iframe');ifr.setAttribute('sandbox','');ifr.srcdoc=applyAssetCache(v.html);
     pane.appendChild(ifr);
   });
   $$('#modal .vdiff').forEach(b=>b.onclick=()=>{
@@ -1485,7 +1623,7 @@ $('#btnAI').onclick=()=>{
       body.innerHTML='<div class="prevsplit"><div><div class="plabel">Current</div></div><div><div class="plabel">AI version</div></div></div>';
       const hosts=body.querySelectorAll('.prevsplit>div');
       [[hosts[0],state.cur.html],[hosts[1],pending]].forEach(([host,html])=>{
-        const f=document.createElement('iframe');f.setAttribute('sandbox','');f.srcdoc=html;host.appendChild(f);});
+        const f=document.createElement('iframe');f.setAttribute('sandbox','');f.srcdoc=applyAssetCache(html);host.appendChild(f);});
     }
   };
   const upd=debounce(()=>{
@@ -1512,6 +1650,8 @@ $('#btnAI').onclick=()=>{
       'Rules:',
       '- Return the COMPLETE updated file as a single ```html code block — no explanations before or after.',
       '- Keep it fully self-contained: all CSS and JS inline, no external resources (no CDN links, no web fonts, no remote images).',
+      ...(state.cur.assets&&Object.keys(state.cur.assets).length?
+        ['- This document bundles linked files as <style data-hs-src="..."> and <script data-hs-src="..."> blocks. KEEP those attributes and blocks intact — they map back to real files on disk.']:[]),
       '- Preserve the existing content and structure except where the request requires changes.',
       '',
       'Request: '+req,
@@ -1777,7 +1917,7 @@ $('#btnColors').onclick=()=>{
 const TOUR=[
   {title:'Welcome to Hypershelf 👋',text:'A library + editor for self-contained HTML files. Everything stays on your machine — nothing is uploaded anywhere. Here\'s a 30-second tour.'},
   {sel:'.btnrow',title:'Add files',text:'＋ New creates a blank file, Upload imports .html files, Paste adds raw HTML. You can also drag & drop files straight onto the grid.'},
-  {sel:'#diskSection',title:'This computer',text:'Connect a real folder (Chrome/Edge) — opening a file there edits the actual file on disk, and Save writes straight back to it.'},
+  {sel:'#diskSection',title:'This computer',text:'Connect a real folder (Chrome/Edge) — opening a file there edits the actual files on disk. Sites split across HTML, CSS and JS files work too: Hypershelf bundles them for editing and Save writes each file back.'},
   {sel:'.side-footer',title:'Backups, theme & this tour',text:'Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too.'},
   {sel:'#grid .card',title:'The editor',text:'Open any file: Interact runs it live, Edit lets you click, restyle, drag and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat.'}
 ];
