@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hypershelf — your HTML file library</title>
+<title>Hypershelf</title>
 <link rel="icon" type="image/png" id="favicon" href="">
 <meta name="theme-color" content="#000000">
 <style>
@@ -103,7 +103,8 @@
   .ed-head{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
   .ed-head #edName{font-weight:600;font-size:14px;width:280px;background:transparent;border-color:transparent}
   .ed-head #edName:hover,.ed-head #edName:focus{background:var(--panel2);border-color:var(--border)}
-  .modes{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;margin:0 auto}
+  .ctools{display:flex;align-items:center;gap:8px;margin:0 auto}
+  .modes{display:flex;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
   .modes button{border:none;background:none;padding:5px 16px;border-radius:6px;color:var(--muted)}
   .modes button:hover{color:var(--text)}
   .modes button.active{background:var(--accent);color:#02131f;font-weight:700}
@@ -322,17 +323,19 @@
       <div class="dirty-dot" id="dirtyDot" title="Unsaved changes"></div>
       <button class="ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
       <button class="ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
-      <div class="modes" id="mouseModes">
-        <button data-mmode="interact" class="active" title="Use the page live — scripts, buttons, and links work">🖱 Interact</button>
-        <button data-mmode="edit" title="Click any element to edit it">✎ Edit</button>
+      <div class="ctools">
+        <div class="modes" id="mouseModes">
+          <button data-mmode="interact" class="active" title="Use the page live — scripts, buttons, and links work">🖱 Interact</button>
+          <button data-mmode="edit" title="Click any element to edit it">✎ Edit</button>
+        </div>
+        <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
+        <select id="widthSel" title="Preview width">
+          <option value="">Full width</option>
+          <option value="1024">1024 px</option>
+          <option value="768">768 px</option>
+          <option value="390">390 px</option>
+        </select>
       </div>
-      <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
-      <select id="widthSel" title="Preview width">
-        <option value="">Full width</option>
-        <option value="1024">1024 px</option>
-        <option value="768">768 px</option>
-        <option value="390">390 px</option>
-      </select>
       <button id="btnColors" title="See and edit every color and font in this file">🎨 Colors</button>
       <button id="btnHistory" title="Snapshots stored on every Save">⌛ History</button>
       <button id="btnAI" title="Round-trip this file through any AI chat">🤖 AI</button>
@@ -1842,6 +1845,11 @@ const WELCOME=`<!DOCTYPE html>
 </html>`;
 (async function init(){
   $('#favicon').href=$('.logo img.mark').src; /* favicon reuses the embedded logo (one copy in the file) */
+  /* Vercel Web Analytics — only on the deployed site, so local copies stay dependency-free */
+  if(location.hostname.endsWith('.vercel.app')){
+    const va=document.createElement('script');va.defer=true;va.src='/_vercel/insights/script.js';
+    document.head.appendChild(va);
+  }
   await openDB();
   state.files=await idb.all('files');
   state.folders=await idb.all('folders');
