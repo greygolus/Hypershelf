@@ -2144,7 +2144,7 @@ ${text}
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aurora Coffee — demo site</title>
+<title>Aurora Coffee — Hypershelf example site</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -2152,41 +2152,63 @@ ${text}
   <img src="images/logo.svg" alt="Aurora Coffee logo" class="logo">
   <nav><a href="#">Menu</a><a href="#">Story</a><a href="#">Visit</a></nav>
 </header>
+
+<section class="howto">
+  <span class="chip">✎ Edit mode: click anything to restyle it</span>
+  <span class="chip">↔ drag a selected card to reorder</span>
+  <span class="chip">◢ resize the banner by its handles</span>
+  <span class="chip">🎨 Colors reskins every file at once</span>
+</section>
+
 <main>
   <section class="hero">
     <h1>Aurora Coffee</h1>
     <p class="tag">Small-batch roasts, big ideas.</p>
     <button id="cta">Order a cup ☕</button>
+    <p class="clock">Roastery time: <span id="clock">--:--:--</span> — ticking proof that <b>js/app.js</b> is running (Interact mode).</p>
   </section>
+
   <section class="cards">
     <div class="card"><h2>Ember</h2><p>Dark roast with cocoa depth and a slow, warm finish.</p><span class="price">$4</span></div>
     <div class="card"><h2>Drift</h2><p>Smooth medium roast, honey sweetness, zero bitterness.</p><span class="price">$5</span></div>
     <div class="card"><h2>Polar</h2><p>Flash-chilled and bright, with citrus high notes.</p><span class="price">$6</span></div>
   </section>
+  <p class="note">☝ These three share the class <b>.card</b> — select one, set "Apply style edits to: <b>all .card (3)</b>", and one edit styles all of them. On Save the rule lands in <b>css/style.css</b>.</p>
+
+  <section class="banner">◢ Select this banner and drag its corner handle to resize it — then try a <b>glow</b> shadow from the Border &amp; effects section.</section>
 </main>
-<footer>This is Hypershelf's example site — the HTML, CSS and JS live in <b>separate files</b>. Edit anything and hit Save: each change lands in the right file.</footer>
+
+<footer>This site is Hypershelf's multi-file example: the page is <b>index.html</b>, its look lives in <b>css/style.css</b>, its behavior in <b>js/app.js</b>. Edit anything, hit Save once — every change is written back to the right file.</footer>
 <script src="js/app.js"><\/script>
 </body>
 </html>`,
-    "hypershelf-example/css/style.css": `/* Aurora Coffee — this stylesheet is a separate file that Hypershelf
-   bundles into the editor. Try the 🎨 Colors panel: every color below
-   shows up as a swatch you can swap everywhere at once. */
+    "hypershelf-example/css/style.css": `/* ====================================================================
+   Aurora Coffee — css/style.css (a real separate file)
+   Hypershelf bundles this into the editor, so everything here can be
+   edited visually:
+   · open 🎨 Colors — every color below becomes a swatch, and the TWO
+     font-family stacks (headings vs body) appear as editable font rows
+   · "apply to all similar" edits are appended here as rules on Save
+   ==================================================================== */
 
 :root { color-scheme: dark; }
 
 body {
   margin: 0;
-  background: #1b1410;
+  background: #171310;
   color: #f3e9dc;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', sans-serif;
   line-height: 1.6;
+}
+h1, h2 {
+  font-family: Rockwell, 'Rockwell Nova', 'Roboto Slab', 'DejaVu Serif', serif;
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 32px;
+  padding: 16px 32px;
   border-bottom: 1px solid #3a2c22;
 }
 .logo { width: 44px; height: 44px; }
@@ -2200,9 +2222,27 @@ nav a {
 }
 nav a:hover { color: #e08e45; }
 
+/* the "how to play" strip */
+.howto {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 12px 20px;
+  background: #0d0c0a;
+  border-bottom: 1px solid #2c241d;
+}
+.chip {
+  border: 1px solid #3a2c22;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  color: #cbb59e;
+}
+
 .hero {
   text-align: center;
-  padding: 72px 24px 56px;
+  padding: 64px 24px 44px;
   background: radial-gradient(circle at 50% 120%, rgba(224, 142, 69, 0.25), transparent 65%);
 }
 .hero h1 {
@@ -2212,7 +2252,7 @@ nav a:hover { color: #e08e45; }
   letter-spacing: 0.04em;
 }
 .hero .tag {
-  margin: 0 0 28px;
+  margin: 0 0 26px;
   color: #cbb59e;
   font-style: italic;
   font-size: 19px;
@@ -2229,19 +2269,22 @@ nav a:hover { color: #e08e45; }
   transition: transform 0.15s;
 }
 #cta:hover { transform: scale(1.05); }
+.clock { font-size: 13px; color: #8a7461; margin: 20px 0 0; }
+.clock b { color: #cbb59e; }
+#clock { color: #7fb069; font-weight: bold; }
 
 .cards {
   display: flex;
   gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
-  padding: 30px 24px 60px;
+  padding: 26px 24px 4px;
 }
 .card {
-  background: #261d17;
+  background: #241d16;
   border: 1px solid #3a2c22;
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: 20px 22px;
   width: 230px;
 }
 .card h2 { margin: 0 0 8px; color: #7fb069; font-size: 22px; }
@@ -2251,16 +2294,42 @@ nav a:hover { color: #e08e45; }
   font-weight: bold;
   font-size: 18px;
 }
+.note {
+  max-width: 640px;
+  margin: 8px auto 0;
+  padding: 0 24px;
+  text-align: center;
+  font-size: 13px;
+  color: #8a7461;
+}
+.note b { color: #e08e45; }
+
+.banner {
+  max-width: 560px;
+  margin: 30px auto 40px;
+  background: linear-gradient(135deg, #2a1c10, #171310);
+  border: 1px dashed #e08e45;
+  border-radius: 14px;
+  padding: 26px 30px;
+  text-align: center;
+  color: #cbb59e;
+}
+.banner b { color: #e08e45; }
 
 footer {
   text-align: center;
   color: #8a7461;
   font-size: 13px;
-  padding: 22px;
+  padding: 20px 24px;
   border-top: 1px solid #3a2c22;
-}`,
-    "hypershelf-example/js/app.js": `// Aurora Coffee — this script is a separate file that Hypershelf bundles
-// into the editor. It runs live in Interact mode; Edit mode pauses it.
+}
+footer b { color: #cbb59e; }`,
+    "hypershelf-example/js/app.js": `// ====================================================================
+// Aurora Coffee — js/app.js (a real separate file)
+// It runs live in 🖱 Interact mode; ✎ Edit mode pauses it so the page
+// holds still while you restyle it. Edits made to this block in the
+// ‹/› Code panel are written back to js/app.js on Save.
+// ====================================================================
 
 const btn = document.getElementById('cta');
 let orders = 0;
@@ -2268,6 +2337,12 @@ btn.addEventListener('click', () => {
   orders++;
   btn.textContent = orders + (orders === 1 ? ' cup' : ' cups') + ' coming up ☕';
 });
+
+// live clock — visible proof the script file is running
+const clock = document.getElementById('clock');
+function tick(){ clock.textContent = new Date().toLocaleTimeString(); }
+tick();
+setInterval(tick, 1000);
 
 // gentle entrance for the menu cards
 document.querySelectorAll('.card').forEach((card, i) => {
@@ -2965,9 +3040,20 @@ document.querySelectorAll('.card').forEach((card, i) => {
   var TOUR = [
     { title: "Welcome to Hypershelf 👋", text: "A library + editor for self-contained HTML files. Everything stays on your machine — nothing is uploaded anywhere. Here's a 30-second tour." },
     { sel: ".btnrow", title: "Add files", text: "＋ New creates a blank file, Upload imports .html files, Paste adds raw HTML. You can also drag & drop files straight onto the grid." },
-    { sel: "#diskSection", title: "This computer", text: "Connect a real folder (Chrome/Edge) — opening a file there edits the actual files on disk. Sites split across HTML, CSS and JS files work too: Hypershelf bundles them for editing and Save writes each file back." },
+    {
+      sel: "#diskSection",
+      title: "Real files on your computer",
+      text: "Connect any folder — even your Desktop (Chrome/Edge). Sites split across separate HTML, CSS and JS files open as ONE editable document, and Save writes every change back to the right file. The button below picks a folder and drops a small example site into it so you can try it right now.",
+      action: {
+        label: "📂 Connect a folder & add the example site",
+        run: async () => {
+          await connectFolder();
+          if (state.disk.handle) await createExampleSite();
+        }
+      }
+    },
     { sel: ".side-footer", title: "Backups, theme & this tour", text: "Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too." },
-    { sel: "#grid .card", title: "The editor", text: "Open any file: Interact runs it live, Edit lets you click, restyle, drag, resize and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat." }
+    { sel: "#grid .card", title: "Start with the Welcome file", text: `It's an interactive playground: every editor feature — click-to-edit, drag, resize, "apply to all similar", 🎨 Colors, built-in fonts, ⌛ History, 🤖 AI — each with a small "try it" you can do in seconds.` }
   ];
   var tourI = -1;
   function startTour() {
@@ -3005,6 +3091,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
       height: r.height + (s.sel ? pad * 2 : 0) + "px"
     });
     card.innerHTML = `<h4>${s.title}</h4><p>${s.text}</p>
+    ${s.action ? `<button class="primary" id="tAct" style="width:100%;margin-bottom:10px">${s.action.label}</button>` : ""}
     <div class="tbtns"><span class="tstep">${tourI + 1} / ${TOUR.length}</span>
       <span><button class="ghost" id="tSkip">Skip</button>
       <button class="primary" id="tNext">${tourI === TOUR.length - 1 ? "Done" : "Next"}</button></span></div>`;
@@ -3018,6 +3105,14 @@ document.querySelectorAll('.card').forEach((card, i) => {
     card.style.top = Math.max(10, Math.min(cy, innerHeight - 190)) + "px";
     $("#tSkip").onclick = endTour;
     $("#tNext").onclick = tourNext;
+    if (s.action) $("#tAct").onclick = async () => {
+      try {
+        await s.action.run();
+      } catch {
+      }
+      tourI--;
+      tourNext();
+    };
   }
   $("#btnTour").onclick = startTour;
 
@@ -3074,27 +3169,64 @@ document.querySelectorAll('.card').forEach((card, i) => {
 <meta charset="UTF-8">
 <title>Welcome to Hypershelf</title>
 <style>
-  body{font-family:system-ui,sans-serif;margin:0;background:#000;color:#eceeed}
+  body{font-family:system-ui,sans-serif;margin:0;background:#000;color:#eceeed;line-height:1.55}
   .hero{background:radial-gradient(circle at 50% 135%,rgba(84,200,255,.35),transparent 65%),#06090c;
-    border-bottom:1px solid #14212b;color:#fff;padding:56px 32px;text-align:center}
+    border-bottom:1px solid #14212b;color:#fff;padding:48px 32px;text-align:center}
   .hero h1{margin:0 0 8px;font-size:32px;letter-spacing:.06em}
   .hero p{margin:0;opacity:.75}
-  main{max-width:660px;margin:32px auto;padding:0 24px}
-  .tip{background:#0c0e10;border:1px solid #212a30;border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  main{max-width:740px;margin:26px auto 50px;padding:0 24px}
+  h2.sec{font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:#54C8FF;margin:34px 0 12px}
+  .tip{background:#0c0e10;border:1px solid #212a30;border-radius:12px;padding:15px 18px;margin-bottom:12px}
   .tip b{color:#54C8FF}
-  button.demo{background:linear-gradient(135deg,#54C8FF,#2493DC);color:#02131f;font-weight:700;border:none;border-radius:8px;padding:10px 20px;
-    font-size:15px;cursor:pointer;display:block;margin:24px auto}
+  .try{display:block;margin-top:7px;font-size:13px;color:#8fa3ad}
+  .try::before{content:'▸ try it: ';color:#4cd97b;font-weight:600}
+  button.demo{background:linear-gradient(135deg,#54C8FF,#2493DC);color:#02131f;font-weight:700;border:none;
+    border-radius:8px;padding:9px 18px;font-size:14px;cursor:pointer;display:block;margin:12px 0 2px}
+  .badges{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 2px}
+  .badge{background:#101418;border:1px solid #223440;border-radius:999px;padding:6px 16px;color:#9fb6c1;font-size:14px}
+  .box{width:220px;height:80px;background:#0c1116;border:1px dashed #2a4a5e;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;color:#54C8FF;margin:12px 0 2px}
 </style>
 </head>
 <body>
-<div class="hero"><h1>Welcome to Hypershelf 📚</h1><p>A home for your self-contained HTML files.</p></div>
+<div class="hero"><h1>Welcome to Hypershelf 📚</h1>
+  <p>Your library + editor for self-contained HTML files. This page is a playground — everything below is safe to break.</p></div>
 <main>
-  <div class="tip"><b>🖱 Interact</b> mouse mode uses the page live — scripts run in a sandbox. Try the button below.</div>
-  <div class="tip"><b>✎ Edit</b> mouse mode lets you click any element to change its text, colors, font, and size — or delete it.</div>
-  <div class="tip"><b>‹/› Code</b> opens the source side-by-side — clicking an element in Edit mode jumps to and highlights its line, like Chrome's inspector.</div>
-  <div class="tip"><b>📂 Open folder</b> (sidebar) connects a real folder on your computer — edits save straight to the actual files.</div>
-  <div class="tip">Shelf files are stored in <b>this browser</b>. Use <b>Export library backup</b> to move or back up your shelf.</div>
-  <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
+  <h2 class="sec">The two mouse modes</h2>
+  <div class="tip"><b>🖱 Interact</b> runs the page live, scripts and all.
+    <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
+    <span class="try">click the button, then switch to ✎ Edit (top bar) and notice the page holds still.</span></div>
+  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right.
+    <span class="try">in Edit mode, click this sentence and rewrite it in the Text box.</span></div>
+
+  <h2 class="sec">Move · resize · multiply</h2>
+  <div class="tip"><b>Drag to move</b> — a selected element can be dragged anywhere on the page.
+    <div class="badges"><span class="badge">Alpha</span><span class="badge">Beta</span><span class="badge">Gamma</span></div>
+    <span class="try">select a badge above, then drag it between the others (green line shows where it lands).</span></div>
+  <div class="tip"><b>Resize</b> — a selected element grows cyan ◢ handles on its edges.
+    <div class="box">resize me</div>
+    <span class="try">select the box and drag its corner handle; watch the size readout.</span></div>
+  <div class="tip"><b>Apply to all similar</b> — the inspector's scope picker turns one edit into a CSS rule for every matching element.
+    <span class="try">select one badge, set "Apply style edits to: all .badge (3)", then change the background — all three change.</span></div>
+
+  <h2 class="sec">Styling power</h2>
+  <div class="tip"><b>Inspector sections</b> — Spacing, Layout &amp; size (display + flex controls), Border &amp; effects (shadows, corner radius, opacity), Attributes.
+    <span class="try">give the resize box a <b>glow</b> shadow from Border &amp; effects.</span></div>
+  <div class="tip"><b>🎨 Colors</b> (top bar) lists every color and font in this file with usage counts.
+    <span class="try">open it, click a swatch row, and hover the suggestion tiles — the whole page recolors live before you commit.</span></div>
+  <div class="tip"><b>Built-in fonts</b> — the 🅰 button offers 14 font stacks that render on any machine, no font files needed.
+    <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from 🎨 Colors.</span></div>
+
+  <h2 class="sec">Source &amp; safety nets</h2>
+  <div class="tip"><b>‹/› Code</b> shows the source side-by-side: clicking an element highlights its line, clicking a line selects the element. The panel edge drags to resize.</div>
+  <div class="tip"><b>Undo</b> (Ctrl+Z) covers everything; <b>⌛ History</b> keeps a snapshot of every Save with diffs and rollback; autosave recovers unsaved work after a crash.</div>
+  <div class="tip"><b>🤖 AI</b> copies this file plus a ready-made prompt for any AI chat — paste the reply back and review a visual diff before accepting.
+    <span class="try">click 🤖 AI, type "make the hero purple", copy, and paste it to your favorite AI.</span></div>
+
+  <h2 class="sec">Real files on your computer</h2>
+  <div class="tip"><b>📂 This computer</b> (sidebar) connects a real folder — sites with separate HTML/CSS/JS files open as one editable document, and one Save writes every file back.
+    <span class="try">connect a folder and click <b>⊕ Create example site</b> for a hands-on multi-file demo.</span></div>
+  <div class="tip">Shelf files live in <b>this browser</b> — use <b>⇩ Export library backup</b> to move or protect them.</div>
 </main>
 </body>
 </html>`;

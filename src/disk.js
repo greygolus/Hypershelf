@@ -172,7 +172,7 @@ const DEMO_FILES={
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aurora Coffee — demo site</title>
+<title>Aurora Coffee — Hypershelf example site</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -180,41 +180,63 @@ const DEMO_FILES={
   <img src="images/logo.svg" alt="Aurora Coffee logo" class="logo">
   <nav><a href="#">Menu</a><a href="#">Story</a><a href="#">Visit</a></nav>
 </header>
+
+<section class="howto">
+  <span class="chip">✎ Edit mode: click anything to restyle it</span>
+  <span class="chip">↔ drag a selected card to reorder</span>
+  <span class="chip">◢ resize the banner by its handles</span>
+  <span class="chip">🎨 Colors reskins every file at once</span>
+</section>
+
 <main>
   <section class="hero">
     <h1>Aurora Coffee</h1>
     <p class="tag">Small-batch roasts, big ideas.</p>
     <button id="cta">Order a cup ☕</button>
+    <p class="clock">Roastery time: <span id="clock">--:--:--</span> — ticking proof that <b>js/app.js</b> is running (Interact mode).</p>
   </section>
+
   <section class="cards">
     <div class="card"><h2>Ember</h2><p>Dark roast with cocoa depth and a slow, warm finish.</p><span class="price">$4</span></div>
     <div class="card"><h2>Drift</h2><p>Smooth medium roast, honey sweetness, zero bitterness.</p><span class="price">$5</span></div>
     <div class="card"><h2>Polar</h2><p>Flash-chilled and bright, with citrus high notes.</p><span class="price">$6</span></div>
   </section>
+  <p class="note">☝ These three share the class <b>.card</b> — select one, set "Apply style edits to: <b>all .card (3)</b>", and one edit styles all of them. On Save the rule lands in <b>css/style.css</b>.</p>
+
+  <section class="banner">◢ Select this banner and drag its corner handle to resize it — then try a <b>glow</b> shadow from the Border &amp; effects section.</section>
 </main>
-<footer>This is Hypershelf's example site — the HTML, CSS and JS live in <b>separate files</b>. Edit anything and hit Save: each change lands in the right file.</footer>
+
+<footer>This site is Hypershelf's multi-file example: the page is <b>index.html</b>, its look lives in <b>css/style.css</b>, its behavior in <b>js/app.js</b>. Edit anything, hit Save once — every change is written back to the right file.</footer>
 <script src="js/app.js"><\/script>
 </body>
 </html>`,
-'hypershelf-example/css/style.css':`/* Aurora Coffee — this stylesheet is a separate file that Hypershelf
-   bundles into the editor. Try the 🎨 Colors panel: every color below
-   shows up as a swatch you can swap everywhere at once. */
+'hypershelf-example/css/style.css':`/* ====================================================================
+   Aurora Coffee — css/style.css (a real separate file)
+   Hypershelf bundles this into the editor, so everything here can be
+   edited visually:
+   · open 🎨 Colors — every color below becomes a swatch, and the TWO
+     font-family stacks (headings vs body) appear as editable font rows
+   · "apply to all similar" edits are appended here as rules on Save
+   ==================================================================== */
 
 :root { color-scheme: dark; }
 
 body {
   margin: 0;
-  background: #1b1410;
+  background: #171310;
   color: #f3e9dc;
-  font-family: Georgia, 'Times New Roman', serif;
+  font-family: Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', sans-serif;
   line-height: 1.6;
+}
+h1, h2 {
+  font-family: Rockwell, 'Rockwell Nova', 'Roboto Slab', 'DejaVu Serif', serif;
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 32px;
+  padding: 16px 32px;
   border-bottom: 1px solid #3a2c22;
 }
 .logo { width: 44px; height: 44px; }
@@ -228,9 +250,27 @@ nav a {
 }
 nav a:hover { color: #e08e45; }
 
+/* the "how to play" strip */
+.howto {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 12px 20px;
+  background: #0d0c0a;
+  border-bottom: 1px solid #2c241d;
+}
+.chip {
+  border: 1px solid #3a2c22;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  color: #cbb59e;
+}
+
 .hero {
   text-align: center;
-  padding: 72px 24px 56px;
+  padding: 64px 24px 44px;
   background: radial-gradient(circle at 50% 120%, rgba(224, 142, 69, 0.25), transparent 65%);
 }
 .hero h1 {
@@ -240,7 +280,7 @@ nav a:hover { color: #e08e45; }
   letter-spacing: 0.04em;
 }
 .hero .tag {
-  margin: 0 0 28px;
+  margin: 0 0 26px;
   color: #cbb59e;
   font-style: italic;
   font-size: 19px;
@@ -257,19 +297,22 @@ nav a:hover { color: #e08e45; }
   transition: transform 0.15s;
 }
 #cta:hover { transform: scale(1.05); }
+.clock { font-size: 13px; color: #8a7461; margin: 20px 0 0; }
+.clock b { color: #cbb59e; }
+#clock { color: #7fb069; font-weight: bold; }
 
 .cards {
   display: flex;
   gap: 20px;
   justify-content: center;
   flex-wrap: wrap;
-  padding: 30px 24px 60px;
+  padding: 26px 24px 4px;
 }
 .card {
-  background: #261d17;
+  background: #241d16;
   border: 1px solid #3a2c22;
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: 20px 22px;
   width: 230px;
 }
 .card h2 { margin: 0 0 8px; color: #7fb069; font-size: 22px; }
@@ -279,16 +322,42 @@ nav a:hover { color: #e08e45; }
   font-weight: bold;
   font-size: 18px;
 }
+.note {
+  max-width: 640px;
+  margin: 8px auto 0;
+  padding: 0 24px;
+  text-align: center;
+  font-size: 13px;
+  color: #8a7461;
+}
+.note b { color: #e08e45; }
+
+.banner {
+  max-width: 560px;
+  margin: 30px auto 40px;
+  background: linear-gradient(135deg, #2a1c10, #171310);
+  border: 1px dashed #e08e45;
+  border-radius: 14px;
+  padding: 26px 30px;
+  text-align: center;
+  color: #cbb59e;
+}
+.banner b { color: #e08e45; }
 
 footer {
   text-align: center;
   color: #8a7461;
   font-size: 13px;
-  padding: 22px;
+  padding: 20px 24px;
   border-top: 1px solid #3a2c22;
-}`,
-'hypershelf-example/js/app.js':`// Aurora Coffee — this script is a separate file that Hypershelf bundles
-// into the editor. It runs live in Interact mode; Edit mode pauses it.
+}
+footer b { color: #cbb59e; }`,
+'hypershelf-example/js/app.js':`// ====================================================================
+// Aurora Coffee — js/app.js (a real separate file)
+// It runs live in 🖱 Interact mode; ✎ Edit mode pauses it so the page
+// holds still while you restyle it. Edits made to this block in the
+// ‹/› Code panel are written back to js/app.js on Save.
+// ====================================================================
 
 const btn = document.getElementById('cta');
 let orders = 0;
@@ -296,6 +365,12 @@ btn.addEventListener('click', () => {
   orders++;
   btn.textContent = orders + (orders === 1 ? ' cup' : ' cups') + ' coming up ☕';
 });
+
+// live clock — visible proof the script file is running
+const clock = document.getElementById('clock');
+function tick(){ clock.textContent = new Date().toLocaleTimeString(); }
+tick();
+setInterval(tick, 1000);
 
 // gentle entrance for the menu cards
 document.querySelectorAll('.card').forEach((card, i) => {

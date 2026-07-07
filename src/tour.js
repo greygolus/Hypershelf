@@ -1,13 +1,18 @@
 import { $ } from './utils.js';
 import { grid } from './library.js';
+import { connectFolder, createExampleSite } from './disk.js';
+import { state } from './state.js';
 
 /* ======================= first-run tour ======================= */
 const TOUR=[
   {title:'Welcome to Hypershelf 👋',text:'A library + editor for self-contained HTML files. Everything stays on your machine — nothing is uploaded anywhere. Here\'s a 30-second tour.'},
   {sel:'.btnrow',title:'Add files',text:'＋ New creates a blank file, Upload imports .html files, Paste adds raw HTML. You can also drag & drop files straight onto the grid.'},
-  {sel:'#diskSection',title:'This computer',text:'Connect a real folder (Chrome/Edge) — opening a file there edits the actual files on disk. Sites split across HTML, CSS and JS files work too: Hypershelf bundles them for editing and Save writes each file back.'},
+  {sel:'#diskSection',title:'Real files on your computer',
+   text:'Connect any folder — even your Desktop (Chrome/Edge). Sites split across separate HTML, CSS and JS files open as ONE editable document, and Save writes every change back to the right file. The button below picks a folder and drops a small example site into it so you can try it right now.',
+   action:{label:'📂 Connect a folder & add the example site',
+     run:async()=>{await connectFolder();if(state.disk.handle)await createExampleSite()}}},
   {sel:'.side-footer',title:'Backups, theme & this tour',text:'Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too.'},
-  {sel:'#grid .card',title:'The editor',text:'Open any file: Interact runs it live, Edit lets you click, restyle, drag, resize and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat.'}
+  {sel:'#grid .card',title:'Start with the Welcome file',text:'It\'s an interactive playground: every editor feature — click-to-edit, drag, resize, "apply to all similar", 🎨 Colors, built-in fonts, ⌛ History, 🤖 AI — each with a small "try it" you can do in seconds.'}
 ];
 let tourI=-1;
 function startTour(){
@@ -29,6 +34,7 @@ function tourNext(){
   Object.assign(hole.style,{left:(r.left-pad)+'px',top:(r.top-pad)+'px',
     width:(r.width+(s.sel?pad*2:0))+'px',height:(r.height+(s.sel?pad*2:0))+'px'});
   card.innerHTML=`<h4>${s.title}</h4><p>${s.text}</p>
+    ${s.action?`<button class="primary" id="tAct" style="width:100%;margin-bottom:10px">${s.action.label}</button>`:''}
     <div class="tbtns"><span class="tstep">${tourI+1} / ${TOUR.length}</span>
       <span><button class="ghost" id="tSkip">Skip</button>
       <button class="primary" id="tNext">${tourI===TOUR.length-1?'Done':'Next'}</button></span></div>`;
@@ -37,6 +43,11 @@ function tourNext(){
   if(cx+320>innerWidth)cx=Math.max(10,r.left-320);
   card.style.left=cx+'px';card.style.top=Math.max(10,Math.min(cy,innerHeight-190))+'px';
   $('#tSkip').onclick=endTour;$('#tNext').onclick=tourNext;
+  if(s.action)$('#tAct').onclick=async()=>{
+    try{await s.action.run()}catch{}
+    /* the layout may have changed (folder connected, grid re-rendered) — re-anchor this step */
+    tourI--;tourNext();
+  };
 }
 $('#btnTour').onclick=startTour;
 
