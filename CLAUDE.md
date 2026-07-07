@@ -7,9 +7,28 @@
 Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." Grey uses single-file HTML documents as replacements for text editors and slide shows (more customization/control, simpler AI integration). Hypershelf is the library + viewer + editor for those files.
 
 **Core philosophy — do not violate:**
-- The entire app is ONE self-contained HTML file: `Hypershelf.html` in this folder. No build step, no framework, no external dependencies, vanilla JS. Keep it that way unless Grey explicitly says otherwise.
-- No backend. All user data stays on the user's machine.
-- `Hypershelf.html` is the only source file. The same file doubles as the deployable `index.html`.
+- The app SHIPS as one self-contained HTML file (`Hypershelf.html`): no framework, no runtime dependencies, vanilla JS. That file is now a **build artifact** — see Architecture below.
+- No backend, no accounts. All user data stays on the user's machine (decided explicitly with Grey July 2026 — local-first forever; if sync ever happens it's an optional layer, not a rewrite).
+- Deployable as-is: the built `Hypershelf.html` is what Vercel serves.
+
+## Architecture (v1.7, July 6 2026) — READ THIS FIRST
+
+**⚠ NEVER edit `Hypershelf.html` directly — it is generated.** Source lives in `src/`; edit there, then `npm run build` (no install needed; uses `npx esbuild`). The build bundles the ES modules, inlines JS+CSS into `src/index.html`'s shell, runs the integrity checks (script-boundary + `node --check` + `</html>`), and overwrites root `Hypershelf.html`. Commit `src/` AND the rebuilt `Hypershelf.html` together.
+
+- `src/index.html` — markup shell (head, library + editor DOM, modal/toast/datalist)
+- `src/styles.css` — all CSS
+- `src/utils.js` — `$`,`$$`, esc, debounce, toast, rgbToHex, uid
+- `src/db.js` — IndexedDB open + `idb` helpers
+- `src/state.js` — the shared `state` object
+- `src/library.js` — shelf grid/sidebar, card menu (+`setOpenMenu`), dialogs, import/create/backup/search
+- `src/disk.js` — File System Access: listing, disk grid, open, multi-file bundling/unbundling, example site
+- `src/editor.js` — editor core: open/save, renderFrame, edit handlers/drag, serialization, applyStyle + scoped rules, inspector, code panel, drafts, width presets, resizer
+- `src/history.js` — undo/redo stack + version snapshots/modal
+- `src/diff.js`, `src/ai.js`, `src/colors.js`, `src/tour.js` — line diff, AI round-trip, 🎨 Colors panel, tour
+- `src/main.js` — init, Welcome seed, analytics injection, and **`window.hs`** — the deliberate debug/test handle (the bundle keeps everything else off the global scope; automated tests drive the app through `hs.*`)
+
+**Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
+Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
 ## Current state (v1.6, working)
 
@@ -93,7 +112,9 @@ IndexedDB db `hypershelf`, version **4**:
 - IndexedDB is per browser + per origin: the local file and any future deployed URL have SEPARATE shelves. JSON backup is the bridge.
 - `beforeunload` guard exists but a hard browser crash loses unsaved editor changes (no autosave yet).
 
-## ⚠ Process warning from the build sessions
+## ⚠ Process warnings from the build sessions
+
+**`npm run build` is the required last step of every change** — it regenerates `Hypershelf.html` and runs the integrity checks automatically (script-boundary mismatch, JS parse, `</html>` terminator). If the build passes, the historical failure modes below are covered; they're kept for context.
 
 While editing via Cowork, large file writes to the vault got **silently truncated at ~40KB** (a Cowork mount sync issue — the app file died mid-script and the whole site went dead until repaired). Claude Code writes directly so this specific failure shouldn't recur, but keep the habit: **after any write, verify the file still ends with `</html>` and the JS parses** (e.g. extract `<script>` body → `node --check`). A broken write here bricks the user's daily tool.
 

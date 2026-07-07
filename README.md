@@ -24,4 +24,11 @@ Note: your shelf is stored per browser + per origin — the deployed site and a 
 
 ## Development
 
-`Hypershelf.html` is the only source file. See [`CLAUDE.md`](CLAUDE.md) for the full architecture handoff (editor internals, data model, invariants) before making changes.
+Source lives in [`src/`](src/) as plain ES modules; `Hypershelf.html` is the **build output** (don't edit it directly).
+
+```
+npm run dev     # serve the repo, open /src/index.html (no build needed)
+npm run build   # bundle src/ → Hypershelf.html (esbuild via npx, no install)
+```
+
+The build inlines everything into the single file and runs integrity checks. See [`CLAUDE.md`](CLAUDE.md) for the full architecture handoff (editor internals, data model, invariants) before making changes.
