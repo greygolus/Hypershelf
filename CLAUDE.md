@@ -20,6 +20,7 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - **Recursive folder listing**: `listDisk` walks subfolders (depth ≤3, skips node_modules/.git/.next/dist/build/.vercel); disk file names are folder-relative paths.
 - **Code panel file-jump** dropdown (`#fileJump`, visible only for bundled projects) scrolls to a bundled file's block. Disk thumbnails bundle CSS too (never scripts).
 - **AI scaffold** gains a rule to preserve `data-hs-src` blocks when the open file is a bundled project.
+- **Built-in example site** (`DEMO_FILES`/`createExampleSite`): "⊕ Create example site" in the disk sidebar (and in the empty-folder state) writes `hypershelf-example/` (index.html + css/style.css + js/app.js + images/logo.svg — the "Aurora Coffee" demo) into the connected folder. A ready-made copy also lives at `C:\Users\greyg\Desktop\hypershelf-example`. NOTE: the demo html inside DEMO_FILES writes its script tag as `<\/script>` in the template literal — required, see the single-file-app trap above.
 - ⚠ **Single-file-app trap (bit us in this build):** any literal `</script` sequence inside the app's own JS (even in a string) TERMINATES the app's script element — the rest of the app renders as page text with NO console error. Always write it split (`'</'+'script'`). The verify step now checks `indexOf('</script')` from the script start equals the real closing tag position — keep using that check after every edit.
 
 ## v1.5 state
