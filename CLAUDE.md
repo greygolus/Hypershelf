@@ -30,6 +30,11 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
+**Added in v1.8 (July 6 2026):**
+- **Resize handles** — E/S/SE cyan handles (`#hsHandles`, injected into the display doc by `ensureHandles`/`positionHandles` in editor.js) on the selected element, with a live "W × H" readout. Box-sizing aware (content-box elements get padding+border subtracted so the OUTER edge follows the mouse). Always applies INLINE (`applyInlineStyle` — resize is per-element; `applyStyle` keeps routing through the scope picker for everything else). Handles hide during element-drag, reposition on scroll/edits, and sync the inspector's W/H fields on release.
+- **Inspector restructured into collapsible `<details class="isec">` sections** (open state persists per session in `inspOpen`): Colors & font, Spacing, **Layout & size** (W/H, display, flex direction/wrap/justify/align/gap — flex controls appear when display is flex — text-align), **Border & effects** (border width/style/color — width auto-defaults style to solid, radius, shadow presets from `SHADOWS` + custom textarea, opacity slider), Attributes. All controls flow through `applyStyle` → scope-picker aware.
+- **Built-in font stacks** (`src/fonts.js`) — 14 curated cross-platform stacks (modern-font-stacks style: System UI, Neo-Grotesque, Humanist, Geometric, Industrial, Rounded, 4 serif families, Slab, 2 monos, Handwritten) needing ZERO font files, so documents stay self-contained. `openFontMenu(anchor,onPick)` floating picker previews each stack in its own face; wired to the inspector font field (🅰) and every font row in the 🎨 Colors panel (🅰 swaps a stack file-wide).
+
 ## Current state (v1.6, working)
 
 **Added in v1.6 (Claude Code, July 6 2026) — multi-file disk projects:**

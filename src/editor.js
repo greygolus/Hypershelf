@@ -5,6 +5,7 @@ import { downloadFile, normalizeName, renderLibrary } from './library.js';
 import { applyAssetCache, saveDiskProject } from './disk.js';
 import { histGo, histInit, histPush, pushVersion, verKey } from './history.js';
 import { closeThemePanel } from './colors.js';
+import { openFontMenu } from './fonts.js';
 
 /* ======================= editor ======================= */
 function setDirty(d){state.dirty=d;$('#dirtyDot').classList.toggle('show',d)}
@@ -105,7 +106,7 @@ $$('#mouseModes button').forEach(b=>b.onclick=()=>setMMode(b.dataset.mmode));
 /* ---------- the page frame (rebuilt fresh on every render) ---------- */
 const HS='data-hs-id';
 function renderFrame(){
-  state.selEl=null;
+  state.selEl=null;dispDoc=null;
   const wrap=$('#frameWrap');wrap.innerHTML='';
   const fr=document.createElement('iframe');
   if(state.mmode==='interact'){
@@ -125,7 +126,13 @@ function renderFrame(){
     st.textContent='[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}'+
       '[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}'+
       '[data-hs-drop-before]{box-shadow:0 -3px 0 0 #4cd97b!important}'+
-      '[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}';
+      '[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}'+
+      '#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}'+
+      '#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}'+
+      '#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}'+
+      '#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}'+
+      '#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}'+
+      '#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}';
     disp.head.appendChild(st);
     fr.onload=()=>attachEditHandlers(fr.contentDocument);
     wrap.appendChild(fr);
@@ -134,15 +141,53 @@ function renderFrame(){
   }
   applyPreviewWidth();
 }
+/* ---------- resize handles (E / S / SE on the selected element) ---------- */
+let dispDoc=null;
+function ensureHandles(doc){
+  let box=doc.getElementById('hsHandles');
+  if(box)return box;
+  box=doc.createElement('div');box.id='hsHandles';
+  box.innerHTML='<div class="hsz" data-h="e" title="Drag to set width"></div>'+
+    '<div class="hsz" data-h="s" title="Drag to set height"></div>'+
+    '<div class="hsz" data-h="se" title="Drag to resize"></div><span id="hsSize"></span>';
+  doc.body.appendChild(box);
+  return box;
+}
+function positionHandles(){
+  if(!dispDoc)return;
+  const box=dispDoc.getElementById('hsHandles');if(!box)return;
+  const el=state.selEl;
+  if(!el||state.mmode!=='edit'){box.style.display='none';return}
+  const r=el.getBoundingClientRect();
+  box.style.display='block';
+  box.style.left=r.left+'px';box.style.top=r.top+'px';
+  box.style.width=r.width+'px';box.style.height=r.height+'px';
+}
 function attachEditHandlers(doc){
   if(!doc||!doc.body)return;
+  dispDoc=doc;
+  const hbox=ensureHandles(doc);
+  /* drag the SELECTED element to move it before/after any other element */
+  let drag=null,justDragged=false,rz=null;
   doc.body.addEventListener('mouseover',e=>{
+    if(rz||(drag&&drag.active))return;
     doc.querySelectorAll('[data-hs-hover]').forEach(el=>el.removeAttribute('data-hs-hover'));
     const t=e.target.closest('['+HS+']');if(t)t.setAttribute('data-hs-hover','')},true);
   doc.body.addEventListener('mouseout',()=>{
     doc.querySelectorAll('[data-hs-hover]').forEach(el=>el.removeAttribute('data-hs-hover'))},true);
-  /* drag the SELECTED element to move it before/after any other element */
-  let drag=null,justDragged=false;
+  /* resizing */
+  hbox.addEventListener('mousedown',e=>{
+    const h=e.target.closest('.hsz');if(!h||!state.selEl)return;
+    e.preventDefault();e.stopPropagation();
+    const cs=doc.defaultView.getComputedStyle(state.selEl);
+    const r=state.selEl.getBoundingClientRect();
+    const sum=(...ps)=>ps.reduce((n,p)=>n+(parseFloat(cs[p])||0),0);
+    rz={h:h.dataset.h,x:e.clientX,y:e.clientY,w:r.width,ht:r.height,
+      /* content-box elements need padding+border subtracted so the OUTER size follows the mouse */
+      bx:cs.boxSizing==='border-box'?0:sum('paddingLeft','paddingRight','borderLeftWidth','borderRightWidth'),
+      by:cs.boxSizing==='border-box'?0:sum('paddingTop','paddingBottom','borderTopWidth','borderBottomWidth')};
+    doc.getElementById('hsSize').style.display='block';
+  },true);
   const clearMarks=()=>doc.querySelectorAll('[data-hs-drop-before],[data-hs-drop-after]')
     .forEach(el=>{el.removeAttribute('data-hs-drop-before');el.removeAttribute('data-hs-drop-after')});
   doc.body.addEventListener('mousedown',e=>{
@@ -150,11 +195,33 @@ function attachEditHandlers(doc){
     if(!t||t!==state.selEl)return; /* only the selected element is draggable */
     drag={el:t,x:e.clientX,y:e.clientY,active:false,target:null,before:false};
   },true);
+  doc.addEventListener('mousemove',e=>{
+    if(!rz)return;
+    e.preventDefault();
+    const w=Math.max(8,rz.w+(rz.h.includes('e')?e.clientX-rz.x:0));
+    const ht=Math.max(8,rz.ht+(rz.h.includes('s')?e.clientY-rz.y:0));
+    if(rz.h.includes('e'))applyInlineStyle('width',Math.max(1,Math.round(w-rz.bx))+'px');
+    if(rz.h.includes('s'))applyInlineStyle('height',Math.max(1,Math.round(ht-rz.by))+'px');
+    doc.getElementById('hsSize').textContent=Math.round(w)+' × '+Math.round(ht);
+  },true);
+  doc.addEventListener('mouseup',()=>{
+    if(!rz)return;rz=null;
+    doc.getElementById('hsSize').style.display='none';
+    positionHandles();
+    /* sync the inspector's W/H fields with the new inline size */
+    if(state.selEl){
+      const wI=$('#iW'),hI=$('#iH');
+      if(wI)wI.value=parseFloat(state.selEl.style.width)||'';
+      if(hI)hI.value=parseFloat(state.selEl.style.height)||'';
+    }
+  },true);
+  doc.addEventListener('scroll',()=>positionHandles(),true);
   doc.body.addEventListener('mousemove',e=>{
-    if(!drag)return;
+    if(!drag||rz)return;
     if(!drag.active){
       if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)<6)return;
       drag.active=true;doc.body.style.cursor='grabbing';
+      hbox.style.display='none'; /* handles out of the way while moving */
     }
     clearMarks();drag.target=null;
     const t=doc.elementFromPoint(e.clientX,e.clientY);
@@ -176,7 +243,7 @@ function attachEditHandlers(doc){
     if(!s||!st2)return;
     if(d.before){d.target.before(d.el);st2.before(s)}
     else{d.target.after(d.el);st2.after(s)}
-    scheduleSerialize();
+    scheduleSerialize();positionHandles();
     if(state.codeOpen)jumpToEl(d.el);
   },true);
   doc.addEventListener('mouseleave',()=>{if(drag){drag=null;doc.body.style.cursor='';clearMarks()}});
@@ -198,7 +265,7 @@ function selectDisplayEl(t,opt={}){
   doc.querySelectorAll('[data-hs-sel]').forEach(el=>el.removeAttribute('data-hs-sel'));
   t.setAttribute('data-hs-sel','');
   if(opt.scrollPage)t.scrollIntoView({block:'center'});
-  state.selEl=t;renderInspector(t);
+  state.selEl=t;renderInspector(t);positionHandles();
   if(state.codeOpen&&!opt.noJump)jumpToEl(t);
 }
 function srcEl(){/* the matching element in the source document */
@@ -216,14 +283,18 @@ function scheduleSerialize(){setDirty(true);clearTimeout(serialT);
 function doSerialize(){serialT=null;
   if(state.srcDoc&&state.mmode==='edit'){state.cur.html=serializeSrc();histPush(state.cur.html);refreshCodeText()}}
 function flushSerialize(){if(serialT){clearTimeout(serialT);doSerialize()}}
-function applyStyle(prop,val){
-  const scopeSel=$('#iScope');
-  if(scopeSel&&scopeSel.value){setScopedRule(scopeSel.value,prop,val);return}
+/* always-inline dual-apply (resize handles use this directly — sizing is per-element) */
+function applyInlineStyle(prop,val){
   const s=srcEl();if(!s||!state.selEl)return;
   if(val===null){state.selEl.style.removeProperty(prop);s.style.removeProperty(prop);
     if(!s.getAttribute('style'))s.removeAttribute('style');}
   else{state.selEl.style.setProperty(prop,val);s.style.setProperty(prop,val);}
-  scheduleSerialize();
+  scheduleSerialize();positionHandles();
+}
+function applyStyle(prop,val){
+  const scopeSel=$('#iScope');
+  if(scopeSel&&scopeSel.value){setScopedRule(scopeSel.value,prop,val);positionHandles();return}
+  applyInlineStyle(prop,val);
 }
 
 /* scoped edits are written as CSS rules into a managed style block (kept in the file) */
@@ -384,22 +455,36 @@ function selectElementAtLine(line){
 }
 
 /* ---------- inspector ---------- */
+/* section open/closed state persists for the session */
+const inspOpen={'Colors & font':true,'Spacing':true};
+const SHADOWS={subtle:'0 1px 3px rgba(0,0,0,.2)',medium:'0 4px 14px rgba(0,0,0,.25)',
+  large:'0 12px 32px rgba(0,0,0,.35)',glow:'0 0 18px rgba(84,200,255,.55)'};
 function renderInspector(el){
   const insp=$('#edInspector');
   if(!el){insp.innerHTML=`<div class="hint"><b>Click any element</b> in the page to edit it.<br><br>
-    You can change its text, colors, font, size, spacing, and attributes — or duplicate and delete it.<br><br>
-    <b>Drag the selected element</b> to move it somewhere else on the page.<br><br>
+    You can change its text, colors, font, size, spacing, layout, borders, shadows, and attributes — or duplicate and delete it.<br><br>
+    <b>Drag the selected element</b> to move it — <b>drag its ◢ handles</b> to resize it.<br><br>
     Scripts are paused while editing; switch the mouse to <b>Interact</b> to use the live page.<br><br>
-    Open <b>‹/› Code</b> to see the clicked element highlighted in the source.</div>`;return}
+    Open <b>‹/› Code</b> to see the clicked element highlighted in the source.</div>`;
+    positionHandles();return}
   const win=el.ownerDocument.defaultView,cs=win.getComputedStyle(el);
   const leaf=el.children.length===0;
   const desc=el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+
     (el.classList.length?'.'+[...el.classList].join('.'):'');
   const colHex=rgbToHex(cs.color),bgHex=rgbToHex(cs.backgroundColor);
+  const stv=p=>el.style.getPropertyValue(p);
+  const num=v=>{const n=parseFloat(v);return isNaN(n)?'':String(n)};
+  const opt=(vals,cur)=>vals.map(v=>
+    `<option value="${v}"${(cur||'')===v?' selected':''}>${v||'(default)'}</option>`).join('');
   const spRow=prop=>['top','right','bottom','left'].map(side=>{
     const p=prop+'-'+side,v=el.style.getPropertyValue(p).replace('px','');
     return `<input type="number" step="1" data-sp="${p}" title="${p}" value="${/^-?\d+(\.\d+)?$/.test(v)?v:''}"
       placeholder="${Math.round(parseFloat(cs.getPropertyValue(p))||0)}">`}).join('');
+  const isec=(title,body)=>`<details class="isec"${inspOpen[title]?' open':''} data-sec="${esc(title)}">
+    <summary>${title}</summary><div class="ibody">${body}</div></details>`;
+  const isFlex=cs.display==='flex'||cs.display==='inline-flex';
+  const curShadow=stv('box-shadow')||(cs.boxShadow!=='none'?cs.boxShadow:'');
+  const shadowKey=curShadow?(Object.entries(SHADOWS).find(([,v])=>v===curShadow)||['custom'])[0]:'';
   const crumbs=[];let cn=el;
   while(cn&&cn.getAttribute&&cn.getAttribute(HS)!==null){crumbs.unshift(cn);cn=cn.parentElement}
   const scopes=scopeOptions(el);
@@ -417,6 +502,7 @@ function renderInspector(el){
       ${leaf?`<textarea id="iText">${esc(el.textContent)}</textarea>`
         :`<div class="hint">This element contains other elements — click deeper to edit text directly.</div>`}
     </div>
+    ${isec('Colors & font',`
     <div class="field"><label>Text color</label>
       <div class="colorrow"><input type="color" id="iColor" value="${colHex||'#000000'}">
         <span class="val" id="iColorV">${colHex||'transparent'}</span>
@@ -426,17 +512,55 @@ function renderInspector(el){
         <span class="val" id="iBgV">${bgHex||'transparent'}</span>
         <button id="iBgX" title="Remove override">reset</button></div></div>
     <div class="field"><label>Font family</label>
-      <input type="text" id="iFont" list="fontList" value="${esc(el.style.fontFamily||'')}"
-        placeholder="${esc(cs.fontFamily.split(',')[0].replace(/"/g,''))}"></div>
+      <div class="fontrow"><input type="text" id="iFont" list="fontList" value="${esc(el.style.fontFamily||'')}"
+        placeholder="${esc(cs.fontFamily.split(',')[0].replace(/"/g,''))}">
+        <button id="iFontPick" title="Built-in font stacks (work on any machine)">🅰</button></div></div>
     <div class="field"><label>Font size</label>
       <div class="sizerow"><input type="number" id="iSize" step="0.5" min="1"
           placeholder="${parseFloat(cs.fontSize)}">
         <select id="iUnit"><option>px</option><option>em</option><option>rem</option><option>%</option></select>
-        <button id="iSizeX" title="Remove override">reset</button></div></div>
+        <button id="iSizeX" title="Remove override">reset</button></div></div>`)}
+    ${isec('Spacing',`
     <div class="field"><label>Margin (px)</label><div class="boxrow">${spRow('margin')}</div></div>
     <div class="field"><label>Padding (px)</label><div class="boxrow">${spRow('padding')}</div>
-      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>
-    <div class="field"><label>Attributes</label><div id="attrList"></div></div>
+      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>`)}
+    ${isec('Layout & size',`
+    <div class="field"><label>Width · Height (px)</label>
+      <div class="boxrow"><input type="number" id="iW" value="${num(stv('width'))}" placeholder="${Math.round(parseFloat(cs.width)||0)}">
+        <input type="number" id="iH" value="${num(stv('height'))}" placeholder="${Math.round(parseFloat(cs.height)||0)}"></div>
+      <div class="boxcap"><span style="width:50%">width</span><span style="width:50%">height</span></div></div>
+    <div class="field"><label>Display</label><select id="iDisp">
+      ${['','block','inline-block','inline','flex','grid','none'].map(d=>
+        `<option value="${d}"${(stv('display')||'')===d?' selected':''}>${d||'(default: '+cs.display+')'}</option>`).join('')}
+    </select></div>
+    ${isFlex?`
+    <div class="field"><label>Flex direction · wrap</label><div class="boxrow">
+      <select id="iFDir" style="width:50%">${opt(['','row','column','row-reverse','column-reverse'],stv('flex-direction'))}</select>
+      <select id="iFWrap" style="width:50%">${opt(['','nowrap','wrap'],stv('flex-wrap'))}</select></div></div>
+    <div class="field"><label>Justify · align</label><div class="boxrow">
+      <select id="iFJus" style="width:50%">${opt(['','flex-start','center','flex-end','space-between','space-around','space-evenly'],stv('justify-content'))}</select>
+      <select id="iFAli" style="width:50%">${opt(['','stretch','flex-start','center','flex-end','baseline'],stv('align-items'))}</select></div></div>
+    <div class="field"><label>Gap (px)</label>
+      <input type="number" id="iFGap" min="0" value="${num(stv('gap'))}" placeholder="${Math.round(parseFloat(cs.gap)||0)}"></div>`:''}
+    <div class="field"><label>Text align</label>
+      <select id="iTAlign">${opt(['','left','center','right','justify'],stv('text-align'))}</select></div>`)}
+    ${isec('Border & effects',`
+    <div class="field"><label>Border width · style</label><div class="boxrow">
+      <input type="number" id="iBW" min="0" value="${num(stv('border-width'))}" placeholder="${Math.round(parseFloat(cs.borderTopWidth)||0)}">
+      <select id="iBSty" style="width:60%">${opt(['','none','solid','dashed','dotted','double'],stv('border-style'))}</select></div></div>
+    <div class="field"><label>Border color</label>
+      <div class="colorrow"><input type="color" id="iBCol" value="${rgbToHex(cs.borderTopColor)||'#000000'}">
+        <span class="val">${rgbToHex(cs.borderTopColor)||'transparent'}</span></div></div>
+    <div class="field"><label>Corner radius (px)</label>
+      <input type="number" id="iRad" min="0" value="${num(stv('border-radius'))}" placeholder="${Math.round(parseFloat(cs.borderTopLeftRadius)||0)}"></div>
+    <div class="field"><label>Shadow</label><select id="iShadow">
+      <option value=""${shadowKey===''?' selected':''}>none</option>
+      ${Object.keys(SHADOWS).map(k=>`<option value="${k}"${shadowKey===k?' selected':''}>${k}</option>`).join('')}
+      <option value="custom"${shadowKey==='custom'?' selected':''}>custom…</option></select>
+      ${shadowKey==='custom'?`<textarea id="iShadowT" style="min-height:40px;font-size:11px;margin-top:6px">${esc(curShadow)}</textarea>`:''}</div>
+    <div class="field"><label>Opacity <span class="val" id="iOpaV">${Math.round((parseFloat(cs.opacity)||1)*100)}%</span></label>
+      <input type="range" id="iOpa" min="5" max="100" value="${Math.round((parseFloat(cs.opacity)||1)*100)}"></div>`)}
+    ${isec('Attributes','<div id="attrList"></div>')}
     <div class="insp-actions">
       <button id="iDup">⧉ Duplicate element</button>
       <button class="danger" id="iDelete">🗑 Delete element</button>
@@ -445,6 +569,7 @@ function renderInspector(el){
   /* keep the chosen scope when the inspector re-renders on the same element (e.g. after a reset) */
   const scopeEl=$('#iScope');
   if(scopeEl&&prevScope&&[...scopeEl.options].some(o=>o.value===prevScope))scopeEl.value=prevScope;
+  insp.querySelectorAll('details.isec').forEach(d=>d.ontoggle=()=>{inspOpen[d.dataset.sec]=d.open});
   insp.querySelectorAll('.crumb:not(.cur)').forEach(c=>c.onclick=()=>{
     const t=el.ownerDocument.querySelector(`[${HS}="${c.dataset.hs}"]`);
     if(t)selectDisplayEl(t,{scrollPage:true});
@@ -467,10 +592,54 @@ function renderInspector(el){
   $('#iBg').oninput=e=>{applyStyle('background-color',e.target.value);$('#iBgV').textContent=e.target.value};
   $('#iBgX').onclick=()=>{applyStyle('background-color',null);renderInspector(el)};
   $('#iFont').onchange=e=>applyStyle('font-family',e.target.value||null);
+  $('#iFontPick').onclick=e=>{e.preventDefault();
+    openFontMenu(e.target,stack=>{$('#iFont').value=stack;applyStyle('font-family',stack)})};
   const sizeApply=()=>{const v=$('#iSize').value;
     applyStyle('font-size',v?v+$('#iUnit').value:null)};
   $('#iSize').oninput=sizeApply;$('#iUnit').onchange=sizeApply;
   $('#iSizeX').onclick=()=>{$('#iSize').value='';applyStyle('font-size',null)};
+  /* layout & size */
+  const pxInput=(id,prop)=>{const i2=$(id);
+    if(i2)i2.oninput=()=>applyStyle(prop,i2.value!==''?i2.value+'px':null)};
+  pxInput('#iW','width');pxInput('#iH','height');pxInput('#iFGap','gap');pxInput('#iRad','border-radius');
+  const selInput=(id,prop,rerender)=>{const s2=$(id);
+    if(s2)s2.onchange=()=>{applyStyle(prop,s2.value||null);if(rerender)renderInspector(el)}};
+  selInput('#iDisp','display',true); /* re-render so the flex controls appear/disappear */
+  selInput('#iFDir','flex-direction');selInput('#iFWrap','flex-wrap');
+  selInput('#iFJus','justify-content');selInput('#iFAli','align-items');
+  selInput('#iTAlign','text-align');
+  /* border & effects */
+  const bw=$('#iBW');
+  if(bw)bw.oninput=()=>{
+    applyStyle('border-width',bw.value!==''?bw.value+'px':null);
+    /* a width with no visible style shows nothing — default to solid once */
+    if(bw.value&&cs.borderTopStyle==='none'&&!$('#iBSty').value){
+      $('#iBSty').value='solid';applyStyle('border-style','solid');
+    }
+  };
+  selInput('#iBSty','border-style');
+  const bc=$('#iBCol');if(bc)bc.oninput=()=>applyStyle('border-color',bc.value);
+  const sh=$('#iShadow');
+  if(sh)sh.onchange=()=>{
+    const v=sh.value;
+    const old=$('#iShadowT');if(old&&v!=='custom')old.remove();
+    if(v==='custom'){
+      if(!$('#iShadowT')){
+        const taEl=document.createElement('textarea');
+        taEl.id='iShadowT';taEl.style.minHeight='40px';taEl.style.fontSize='11px';taEl.style.marginTop='6px';
+        taEl.value=curShadow||'0 4px 14px rgba(0,0,0,.25)';
+        sh.parentElement.appendChild(taEl);
+        taEl.oninput=()=>applyStyle('box-shadow',taEl.value||null);
+        taEl.oninput();
+      }
+    }else applyStyle('box-shadow',v?SHADOWS[v]:null);
+  };
+  const shT=$('#iShadowT');if(shT)shT.oninput=()=>applyStyle('box-shadow',shT.value||null);
+  const op=$('#iOpa');
+  if(op)op.oninput=()=>{
+    $('#iOpaV').textContent=op.value+'%';
+    applyStyle('opacity',op.value==='100'?null:String(op.value/100));
+  };
   $('#iDelete').onclick=()=>{const s=srcEl();if(!s)return;
     el.remove();s.remove();state.selEl=null;
     scheduleSerialize();flushSerialize();setCodeHighlight(-1);renderInspector(null)};

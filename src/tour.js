@@ -7,7 +7,7 @@ const TOUR=[
   {sel:'.btnrow',title:'Add files',text:'＋ New creates a blank file, Upload imports .html files, Paste adds raw HTML. You can also drag & drop files straight onto the grid.'},
   {sel:'#diskSection',title:'This computer',text:'Connect a real folder (Chrome/Edge) — opening a file there edits the actual files on disk. Sites split across HTML, CSS and JS files work too: Hypershelf bundles them for editing and Save writes each file back.'},
   {sel:'.side-footer',title:'Backups, theme & this tour',text:'Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too.'},
-  {sel:'#grid .card',title:'The editor',text:'Open any file: Interact runs it live, Edit lets you click, restyle, drag and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat.'}
+  {sel:'#grid .card',title:'The editor',text:'Open any file: Interact runs it live, Edit lets you click, restyle, drag, resize and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat.'}
 ];
 let tourI=-1;
 function startTour(){

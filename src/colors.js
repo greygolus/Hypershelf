@@ -2,6 +2,7 @@ import { $, debounce, esc, toast } from './utils.js';
 import { state } from './state.js';
 import { refreshCodeText, renderFrame, setCodeHighlight, setDirty, syncNow, updateModeUI } from './editor.js';
 import { histPush } from './history.js';
+import { openFontMenu } from './fonts.js';
 
 /* ======================= file theme panel (🎨 Colors) ======================= */
 /* operates only on CSS regions: <style> blocks and style="" attributes */
@@ -148,6 +149,7 @@ function renderThemePanel(){
     <div class="field"><label>Font stacks (${t.fonts.length})</label>
       ${t.fonts.map((f,i)=>`<div class="tfont">
         <input type="text" list="fontList" data-fi="${i}" value="${esc(f.fam)}" title="${esc(f.fam)}">
+        <button class="fpick" data-fi="${i}" title="Built-in font stacks (work on any machine)">🅰</button>
         <span class="tuse">${f.count}×</span></div>`).join('')||'<span class="tuse">No font-family declarations found.</span>'}`;
   $('#thClose').onclick=closeThemePanel;
   $('#thBack').onclick=()=>{
@@ -169,6 +171,10 @@ function renderThemePanel(){
       themeExpanded=themeExpanded===i?-1:i;
       renderThemePanel();
     };
+  });
+  panel.querySelectorAll('.fpick').forEach(b=>b.onclick=()=>{
+    const inp=panel.querySelector(`input[data-fi="${b.dataset.fi}"]`);
+    openFontMenu(b,stack=>{inp.value=stack;inp.dispatchEvent(new Event('change'))});
   });
   const liveSwap=debounce((grp,val)=>previewColorSwap(grp,val),350);
   panel.querySelectorAll('input[type=color]').forEach(inp=>{

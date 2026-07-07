@@ -269,6 +269,32 @@
   .tuse{font-size:10.5px;color:var(--muted)}
   .tfont{display:flex;align-items:center;gap:8px;margin-bottom:6px}
   .tfont input{flex:1;min-width:0;font-size:12px}
+  .tfont .fpick{flex-shrink:0;padding:4px 9px}
+
+  /* ---------- inspector sections + advanced controls ---------- */
+  details.isec{border:1px solid var(--border);border-radius:9px;background:var(--panel2)}
+  details.isec summary{cursor:pointer;padding:7px 10px;font-size:10.5px;font-family:var(--mono);
+    text-transform:uppercase;letter-spacing:.1em;color:var(--muted);user-select:none;list-style:none;
+    display:flex;justify-content:space-between;align-items:center}
+  details.isec summary::-webkit-details-marker{display:none}
+  details.isec summary::after{content:'▾';font-size:10px}
+  details.isec[open] summary::after{content:'▴'}
+  details.isec .ibody{padding:2px 10px 12px;display:flex;flex-direction:column;gap:10px}
+  details.isec .ibody input,details.isec .ibody select{background:var(--panel)}
+  .fontrow{display:flex;gap:6px}
+  .fontrow input{flex:1;min-width:0}
+  .fontrow button{flex-shrink:0;padding:4px 9px}
+  input[type=range]{accent-color:var(--accent);width:100%;padding:0}
+
+  /* ---------- built-in font stack picker ---------- */
+  #fontMenu{position:fixed;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    box-shadow:0 14px 44px rgba(0,0,0,.55);max-height:340px;overflow-y:auto;width:300px;padding:5px;
+    display:flex;flex-direction:column}
+  #fontMenu button{display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:none;
+    text-align:left;padding:7px 10px;border-radius:8px}
+  #fontMenu button:hover{background:var(--panel2)}
+  #fontMenu .fmName{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  #fontMenu .fmSample{font-size:15.5px;color:var(--text)}
 </style>
 </head>
 <body>
@@ -549,6 +575,54 @@
     <div class="diffview">${rows.join("")}</div>`;
   }
 
+  // src/fonts.js
+  var FONT_STACKS = [
+    { name: "System UI", stack: `system-ui, sans-serif` },
+    { name: "Neo-Grotesque", stack: `Inter, Roboto, 'Helvetica Neue', 'Arial Nova', 'Nimbus Sans', Arial, sans-serif` },
+    { name: "Humanist Sans", stack: `Seravek, 'Gill Sans Nova', Ubuntu, Calibri, 'DejaVu Sans', source-sans-pro, sans-serif` },
+    { name: "Geometric Sans", stack: `Avenir, Montserrat, Corbel, 'URW Gothic', source-sans-pro, sans-serif` },
+    { name: "Industrial", stack: `Bahnschrift, 'DIN Alternate', 'Franklin Gothic Medium', 'Nimbus Sans Narrow', sans-serif-condensed, sans-serif` },
+    { name: "Rounded Sans", stack: `ui-rounded, 'Hiragino Maru Gothic ProN', Quicksand, Comfortaa, Manjari, 'Arial Rounded MT', 'Arial Rounded MT Bold', Calibri, source-sans-pro, sans-serif` },
+    { name: "Classic Serif", stack: `Georgia, 'Times New Roman', serif` },
+    { name: "Transitional Serif", stack: `Charter, 'Bitstream Charter', 'Sitka Text', Cambria, serif` },
+    { name: "Old-Style Serif", stack: `'Iowan Old Style', 'Palatino Linotype', 'URW Palladio L', P052, serif` },
+    { name: "Didone Display", stack: `Didot, 'Bodoni MT', 'Noto Serif Display', 'URW Palladio L', P052, serif` },
+    { name: "Slab Serif", stack: `Rockwell, 'Rockwell Nova', 'Roboto Slab', 'DejaVu Serif', 'Sitka Small', serif` },
+    { name: "Monospace Code", stack: `ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace` },
+    { name: "Typewriter", stack: `'Nimbus Mono PS', 'Courier New', monospace` },
+    { name: "Handwritten", stack: `'Segoe Print', 'Bradley Hand', Chilanka, TSCu_Comic, casual, cursive` }
+  ];
+  var menuEl = null;
+  function closeFontMenu() {
+    if (menuEl) {
+      menuEl.remove();
+      menuEl = null;
+      document.removeEventListener("mousedown", onOutside, true);
+    }
+  }
+  function onOutside(e) {
+    if (menuEl && !menuEl.contains(e.target)) closeFontMenu();
+  }
+  function openFontMenu(anchor, onPick) {
+    closeFontMenu();
+    menuEl = document.createElement("div");
+    menuEl.id = "fontMenu";
+    menuEl.innerHTML = FONT_STACKS.map((f, i) => `<button data-fi="${i}"><span class="fmName">${f.name}</span>
+      <span class="fmSample" style="font-family:${esc(f.stack)}">The quick brown fox · Aa Bb 123</span></button>`).join("");
+    document.body.appendChild(menuEl);
+    const r = anchor.getBoundingClientRect(), mh = Math.min(340, menuEl.offsetHeight);
+    let top = r.bottom + 6;
+    if (top + mh > innerHeight) top = Math.max(8, r.top - mh - 6);
+    menuEl.style.top = top + "px";
+    menuEl.style.left = Math.max(8, Math.min(r.left, innerWidth - 310)) + "px";
+    menuEl.querySelectorAll("button").forEach((b) => b.onclick = () => {
+      const s = FONT_STACKS[+b.dataset.fi].stack;
+      closeFontMenu();
+      onPick(s);
+    });
+    setTimeout(() => document.addEventListener("mousedown", onOutside, true), 0);
+  }
+
   // src/colors.js
   function mapCssRegions(html, fn) {
     html = html.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, a, css, b) => a + fn(css) + b);
@@ -731,6 +805,7 @@
     <div class="field"><label>Font stacks (${t.fonts.length})</label>
       ${t.fonts.map((f, i) => `<div class="tfont">
         <input type="text" list="fontList" data-fi="${i}" value="${esc(f.fam)}" title="${esc(f.fam)}">
+        <button class="fpick" data-fi="${i}" title="Built-in font stacks (work on any machine)">🅰</button>
         <span class="tuse">${f.count}×</span></div>`).join("") || '<span class="tuse">No font-family declarations found.</span>'}`;
     $("#thClose").onclick = closeThemePanel;
     $("#thBack").onclick = () => {
@@ -763,6 +838,13 @@
         themeExpanded = themeExpanded === i ? -1 : i;
         renderThemePanel();
       };
+    });
+    panel.querySelectorAll(".fpick").forEach((b) => b.onclick = () => {
+      const inp = panel.querySelector(`input[data-fi="${b.dataset.fi}"]`);
+      openFontMenu(b, (stack) => {
+        inp.value = stack;
+        inp.dispatchEvent(new Event("change"));
+      });
     });
     const liveSwap = debounce((grp, val) => previewColorSwap(grp, val), 350);
     panel.querySelectorAll("input[type=color]").forEach((inp) => {
@@ -1069,6 +1151,7 @@
   var HS = "data-hs-id";
   function renderFrame() {
     state.selEl = null;
+    dispDoc = null;
     const wrap = $("#frameWrap");
     wrap.innerHTML = "";
     const fr = document.createElement("iframe");
@@ -1088,7 +1171,7 @@
         });
       });
       const st = disp.createElement("style");
-      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-drop-before]{box-shadow:0 -3px 0 0 #4cd97b!important}[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}";
+      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-drop-before]{box-shadow:0 -3px 0 0 #4cd97b!important}[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}";
       disp.head.appendChild(st);
       fr.onload = () => attachEditHandlers(fr.contentDocument);
       wrap.appendChild(fr);
@@ -1097,9 +1180,39 @@
     }
     applyPreviewWidth();
   }
+  var dispDoc = null;
+  function ensureHandles(doc) {
+    let box = doc.getElementById("hsHandles");
+    if (box) return box;
+    box = doc.createElement("div");
+    box.id = "hsHandles";
+    box.innerHTML = '<div class="hsz" data-h="e" title="Drag to set width"></div><div class="hsz" data-h="s" title="Drag to set height"></div><div class="hsz" data-h="se" title="Drag to resize"></div><span id="hsSize"></span>';
+    doc.body.appendChild(box);
+    return box;
+  }
+  function positionHandles() {
+    if (!dispDoc) return;
+    const box = dispDoc.getElementById("hsHandles");
+    if (!box) return;
+    const el = state.selEl;
+    if (!el || state.mmode !== "edit") {
+      box.style.display = "none";
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    box.style.display = "block";
+    box.style.left = r.left + "px";
+    box.style.top = r.top + "px";
+    box.style.width = r.width + "px";
+    box.style.height = r.height + "px";
+  }
   function attachEditHandlers(doc) {
     if (!doc || !doc.body) return;
+    dispDoc = doc;
+    const hbox = ensureHandles(doc);
+    let drag = null, justDragged = false, rz = null;
     doc.body.addEventListener("mouseover", (e) => {
+      if (rz || drag && drag.active) return;
       doc.querySelectorAll("[data-hs-hover]").forEach((el) => el.removeAttribute("data-hs-hover"));
       const t = e.target.closest("[" + HS + "]");
       if (t) t.setAttribute("data-hs-hover", "");
@@ -1107,7 +1220,26 @@
     doc.body.addEventListener("mouseout", () => {
       doc.querySelectorAll("[data-hs-hover]").forEach((el) => el.removeAttribute("data-hs-hover"));
     }, true);
-    let drag = null, justDragged = false;
+    hbox.addEventListener("mousedown", (e) => {
+      const h = e.target.closest(".hsz");
+      if (!h || !state.selEl) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const cs = doc.defaultView.getComputedStyle(state.selEl);
+      const r = state.selEl.getBoundingClientRect();
+      const sum = (...ps) => ps.reduce((n, p) => n + (parseFloat(cs[p]) || 0), 0);
+      rz = {
+        h: h.dataset.h,
+        x: e.clientX,
+        y: e.clientY,
+        w: r.width,
+        ht: r.height,
+        /* content-box elements need padding+border subtracted so the OUTER size follows the mouse */
+        bx: cs.boxSizing === "border-box" ? 0 : sum("paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"),
+        by: cs.boxSizing === "border-box" ? 0 : sum("paddingTop", "paddingBottom", "borderTopWidth", "borderBottomWidth")
+      };
+      doc.getElementById("hsSize").style.display = "block";
+    }, true);
     const clearMarks = () => doc.querySelectorAll("[data-hs-drop-before],[data-hs-drop-after]").forEach((el) => {
       el.removeAttribute("data-hs-drop-before");
       el.removeAttribute("data-hs-drop-after");
@@ -1117,12 +1249,34 @@
       if (!t || t !== state.selEl) return;
       drag = { el: t, x: e.clientX, y: e.clientY, active: false, target: null, before: false };
     }, true);
+    doc.addEventListener("mousemove", (e) => {
+      if (!rz) return;
+      e.preventDefault();
+      const w = Math.max(8, rz.w + (rz.h.includes("e") ? e.clientX - rz.x : 0));
+      const ht = Math.max(8, rz.ht + (rz.h.includes("s") ? e.clientY - rz.y : 0));
+      if (rz.h.includes("e")) applyInlineStyle("width", Math.max(1, Math.round(w - rz.bx)) + "px");
+      if (rz.h.includes("s")) applyInlineStyle("height", Math.max(1, Math.round(ht - rz.by)) + "px");
+      doc.getElementById("hsSize").textContent = Math.round(w) + " × " + Math.round(ht);
+    }, true);
+    doc.addEventListener("mouseup", () => {
+      if (!rz) return;
+      rz = null;
+      doc.getElementById("hsSize").style.display = "none";
+      positionHandles();
+      if (state.selEl) {
+        const wI = $("#iW"), hI = $("#iH");
+        if (wI) wI.value = parseFloat(state.selEl.style.width) || "";
+        if (hI) hI.value = parseFloat(state.selEl.style.height) || "";
+      }
+    }, true);
+    doc.addEventListener("scroll", () => positionHandles(), true);
     doc.body.addEventListener("mousemove", (e) => {
-      if (!drag) return;
+      if (!drag || rz) return;
       if (!drag.active) {
         if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 6) return;
         drag.active = true;
         doc.body.style.cursor = "grabbing";
+        hbox.style.display = "none";
       }
       clearMarks();
       drag.target = null;
@@ -1154,6 +1308,7 @@
         st2.after(s);
       }
       scheduleSerialize();
+      positionHandles();
       if (state.codeOpen) jumpToEl(d.el);
     }, true);
     doc.addEventListener("mouseleave", () => {
@@ -1196,6 +1351,7 @@
     if (opt.scrollPage) t.scrollIntoView({ block: "center" });
     state.selEl = t;
     renderInspector(t);
+    positionHandles();
     if (state.codeOpen && !opt.noJump) jumpToEl(t);
   }
   function srcEl() {
@@ -1226,12 +1382,7 @@
       doSerialize();
     }
   }
-  function applyStyle(prop, val) {
-    const scopeSel = $("#iScope");
-    if (scopeSel && scopeSel.value) {
-      setScopedRule(scopeSel.value, prop, val);
-      return;
-    }
+  function applyInlineStyle(prop, val) {
     const s = srcEl();
     if (!s || !state.selEl) return;
     if (val === null) {
@@ -1243,6 +1394,16 @@
       s.style.setProperty(prop, val);
     }
     scheduleSerialize();
+    positionHandles();
+  }
+  function applyStyle(prop, val) {
+    const scopeSel = $("#iScope");
+    if (scopeSel && scopeSel.value) {
+      setScopedRule(scopeSel.value, prop, val);
+      positionHandles();
+      return;
+    }
+    applyInlineStyle(prop, val);
   }
   function ensureRuleSheet(doc) {
     let st = doc.querySelector("style[data-hs-rules]");
@@ -1276,14 +1437,14 @@
     else r[prop] = val;
     if (!Object.keys(r).length) delete rules[selector];
     const text = Object.entries(rules).map(([s, ps]) => s + "{" + Object.entries(ps).map(([p, v]) => p + ":" + v).join(";") + "}").join("\n");
-    const dispDoc = state.selEl && state.selEl.ownerDocument;
+    const dispDoc2 = state.selEl && state.selEl.ownerDocument;
     if (!text) {
       srcSheet.remove();
-      const d = dispDoc && dispDoc.querySelector("style[data-hs-rules]");
+      const d = dispDoc2 && dispDoc2.querySelector("style[data-hs-rules]");
       if (d) d.remove();
     } else {
       srcSheet.textContent = text;
-      if (dispDoc) ensureRuleSheet(dispDoc).textContent = text;
+      if (dispDoc2) ensureRuleSheet(dispDoc2).textContent = text;
     }
     scheduleSerialize();
   }
@@ -1438,25 +1599,44 @@
       return;
     }
   }
+  var inspOpen = { "Colors & font": true, "Spacing": true };
+  var SHADOWS = {
+    subtle: "0 1px 3px rgba(0,0,0,.2)",
+    medium: "0 4px 14px rgba(0,0,0,.25)",
+    large: "0 12px 32px rgba(0,0,0,.35)",
+    glow: "0 0 18px rgba(84,200,255,.55)"
+  };
   function renderInspector(el) {
     const insp = $("#edInspector");
     if (!el) {
       insp.innerHTML = `<div class="hint"><b>Click any element</b> in the page to edit it.<br><br>
-    You can change its text, colors, font, size, spacing, and attributes — or duplicate and delete it.<br><br>
-    <b>Drag the selected element</b> to move it somewhere else on the page.<br><br>
+    You can change its text, colors, font, size, spacing, layout, borders, shadows, and attributes — or duplicate and delete it.<br><br>
+    <b>Drag the selected element</b> to move it — <b>drag its ◢ handles</b> to resize it.<br><br>
     Scripts are paused while editing; switch the mouse to <b>Interact</b> to use the live page.<br><br>
     Open <b>‹/› Code</b> to see the clicked element highlighted in the source.</div>`;
+      positionHandles();
       return;
     }
     const win = el.ownerDocument.defaultView, cs = win.getComputedStyle(el);
     const leaf = el.children.length === 0;
     const desc = el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList.length ? "." + [...el.classList].join(".") : "");
     const colHex = rgbToHex(cs.color), bgHex = rgbToHex(cs.backgroundColor);
+    const stv = (p) => el.style.getPropertyValue(p);
+    const num = (v) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? "" : String(n);
+    };
+    const opt = (vals, cur) => vals.map((v) => `<option value="${v}"${(cur || "") === v ? " selected" : ""}>${v || "(default)"}</option>`).join("");
     const spRow = (prop) => ["top", "right", "bottom", "left"].map((side) => {
       const p = prop + "-" + side, v = el.style.getPropertyValue(p).replace("px", "");
       return `<input type="number" step="1" data-sp="${p}" title="${p}" value="${/^-?\d+(\.\d+)?$/.test(v) ? v : ""}"
       placeholder="${Math.round(parseFloat(cs.getPropertyValue(p)) || 0)}">`;
     }).join("");
+    const isec = (title, body) => `<details class="isec"${inspOpen[title] ? " open" : ""} data-sec="${esc(title)}">
+    <summary>${title}</summary><div class="ibody">${body}</div></details>`;
+    const isFlex = cs.display === "flex" || cs.display === "inline-flex";
+    const curShadow = stv("box-shadow") || (cs.boxShadow !== "none" ? cs.boxShadow : "");
+    const shadowKey = curShadow ? (Object.entries(SHADOWS).find(([, v]) => v === curShadow) || ["custom"])[0] : "";
     const crumbs = [];
     let cn = el;
     while (cn && cn.getAttribute && cn.getAttribute(HS) !== null) {
@@ -1476,6 +1656,7 @@
     <div class="field"><label>Text</label>
       ${leaf ? `<textarea id="iText">${esc(el.textContent)}</textarea>` : `<div class="hint">This element contains other elements — click deeper to edit text directly.</div>`}
     </div>
+    ${isec("Colors & font", `
     <div class="field"><label>Text color</label>
       <div class="colorrow"><input type="color" id="iColor" value="${colHex || "#000000"}">
         <span class="val" id="iColorV">${colHex || "transparent"}</span>
@@ -1485,17 +1666,54 @@
         <span class="val" id="iBgV">${bgHex || "transparent"}</span>
         <button id="iBgX" title="Remove override">reset</button></div></div>
     <div class="field"><label>Font family</label>
-      <input type="text" id="iFont" list="fontList" value="${esc(el.style.fontFamily || "")}"
-        placeholder="${esc(cs.fontFamily.split(",")[0].replace(/"/g, ""))}"></div>
+      <div class="fontrow"><input type="text" id="iFont" list="fontList" value="${esc(el.style.fontFamily || "")}"
+        placeholder="${esc(cs.fontFamily.split(",")[0].replace(/"/g, ""))}">
+        <button id="iFontPick" title="Built-in font stacks (work on any machine)">🅰</button></div></div>
     <div class="field"><label>Font size</label>
       <div class="sizerow"><input type="number" id="iSize" step="0.5" min="1"
           placeholder="${parseFloat(cs.fontSize)}">
         <select id="iUnit"><option>px</option><option>em</option><option>rem</option><option>%</option></select>
-        <button id="iSizeX" title="Remove override">reset</button></div></div>
+        <button id="iSizeX" title="Remove override">reset</button></div></div>`)}
+    ${isec("Spacing", `
     <div class="field"><label>Margin (px)</label><div class="boxrow">${spRow("margin")}</div></div>
     <div class="field"><label>Padding (px)</label><div class="boxrow">${spRow("padding")}</div>
-      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>
-    <div class="field"><label>Attributes</label><div id="attrList"></div></div>
+      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>`)}
+    ${isec("Layout & size", `
+    <div class="field"><label>Width · Height (px)</label>
+      <div class="boxrow"><input type="number" id="iW" value="${num(stv("width"))}" placeholder="${Math.round(parseFloat(cs.width) || 0)}">
+        <input type="number" id="iH" value="${num(stv("height"))}" placeholder="${Math.round(parseFloat(cs.height) || 0)}"></div>
+      <div class="boxcap"><span style="width:50%">width</span><span style="width:50%">height</span></div></div>
+    <div class="field"><label>Display</label><select id="iDisp">
+      ${["", "block", "inline-block", "inline", "flex", "grid", "none"].map((d) => `<option value="${d}"${(stv("display") || "") === d ? " selected" : ""}>${d || "(default: " + cs.display + ")"}</option>`).join("")}
+    </select></div>
+    ${isFlex ? `
+    <div class="field"><label>Flex direction · wrap</label><div class="boxrow">
+      <select id="iFDir" style="width:50%">${opt(["", "row", "column", "row-reverse", "column-reverse"], stv("flex-direction"))}</select>
+      <select id="iFWrap" style="width:50%">${opt(["", "nowrap", "wrap"], stv("flex-wrap"))}</select></div></div>
+    <div class="field"><label>Justify · align</label><div class="boxrow">
+      <select id="iFJus" style="width:50%">${opt(["", "flex-start", "center", "flex-end", "space-between", "space-around", "space-evenly"], stv("justify-content"))}</select>
+      <select id="iFAli" style="width:50%">${opt(["", "stretch", "flex-start", "center", "flex-end", "baseline"], stv("align-items"))}</select></div></div>
+    <div class="field"><label>Gap (px)</label>
+      <input type="number" id="iFGap" min="0" value="${num(stv("gap"))}" placeholder="${Math.round(parseFloat(cs.gap) || 0)}"></div>` : ""}
+    <div class="field"><label>Text align</label>
+      <select id="iTAlign">${opt(["", "left", "center", "right", "justify"], stv("text-align"))}</select></div>`)}
+    ${isec("Border & effects", `
+    <div class="field"><label>Border width · style</label><div class="boxrow">
+      <input type="number" id="iBW" min="0" value="${num(stv("border-width"))}" placeholder="${Math.round(parseFloat(cs.borderTopWidth) || 0)}">
+      <select id="iBSty" style="width:60%">${opt(["", "none", "solid", "dashed", "dotted", "double"], stv("border-style"))}</select></div></div>
+    <div class="field"><label>Border color</label>
+      <div class="colorrow"><input type="color" id="iBCol" value="${rgbToHex(cs.borderTopColor) || "#000000"}">
+        <span class="val">${rgbToHex(cs.borderTopColor) || "transparent"}</span></div></div>
+    <div class="field"><label>Corner radius (px)</label>
+      <input type="number" id="iRad" min="0" value="${num(stv("border-radius"))}" placeholder="${Math.round(parseFloat(cs.borderTopLeftRadius) || 0)}"></div>
+    <div class="field"><label>Shadow</label><select id="iShadow">
+      <option value=""${shadowKey === "" ? " selected" : ""}>none</option>
+      ${Object.keys(SHADOWS).map((k) => `<option value="${k}"${shadowKey === k ? " selected" : ""}>${k}</option>`).join("")}
+      <option value="custom"${shadowKey === "custom" ? " selected" : ""}>custom…</option></select>
+      ${shadowKey === "custom" ? `<textarea id="iShadowT" style="min-height:40px;font-size:11px;margin-top:6px">${esc(curShadow)}</textarea>` : ""}</div>
+    <div class="field"><label>Opacity <span class="val" id="iOpaV">${Math.round((parseFloat(cs.opacity) || 1) * 100)}%</span></label>
+      <input type="range" id="iOpa" min="5" max="100" value="${Math.round((parseFloat(cs.opacity) || 1) * 100)}"></div>`)}
+    ${isec("Attributes", '<div id="attrList"></div>')}
     <div class="insp-actions">
       <button id="iDup">⧉ Duplicate element</button>
       <button class="danger" id="iDelete">🗑 Delete element</button>
@@ -1503,6 +1721,9 @@
     </div>`;
     const scopeEl = $("#iScope");
     if (scopeEl && prevScope && [...scopeEl.options].some((o) => o.value === prevScope)) scopeEl.value = prevScope;
+    insp.querySelectorAll("details.isec").forEach((d) => d.ontoggle = () => {
+      inspOpen[d.dataset.sec] = d.open;
+    });
     insp.querySelectorAll(".crumb:not(.cur)").forEach((c) => c.onclick = () => {
       const t = el.ownerDocument.querySelector(`[${HS}="${c.dataset.hs}"]`);
       if (t) selectDisplayEl(t, { scrollPage: true });
@@ -1546,6 +1767,13 @@
       renderInspector(el);
     };
     $("#iFont").onchange = (e) => applyStyle("font-family", e.target.value || null);
+    $("#iFontPick").onclick = (e) => {
+      e.preventDefault();
+      openFontMenu(e.target, (stack) => {
+        $("#iFont").value = stack;
+        applyStyle("font-family", stack);
+      });
+    };
     const sizeApply = () => {
       const v = $("#iSize").value;
       applyStyle("font-size", v ? v + $("#iUnit").value : null);
@@ -1555,6 +1783,64 @@
     $("#iSizeX").onclick = () => {
       $("#iSize").value = "";
       applyStyle("font-size", null);
+    };
+    const pxInput = (id, prop) => {
+      const i2 = $(id);
+      if (i2) i2.oninput = () => applyStyle(prop, i2.value !== "" ? i2.value + "px" : null);
+    };
+    pxInput("#iW", "width");
+    pxInput("#iH", "height");
+    pxInput("#iFGap", "gap");
+    pxInput("#iRad", "border-radius");
+    const selInput = (id, prop, rerender) => {
+      const s2 = $(id);
+      if (s2) s2.onchange = () => {
+        applyStyle(prop, s2.value || null);
+        if (rerender) renderInspector(el);
+      };
+    };
+    selInput("#iDisp", "display", true);
+    selInput("#iFDir", "flex-direction");
+    selInput("#iFWrap", "flex-wrap");
+    selInput("#iFJus", "justify-content");
+    selInput("#iFAli", "align-items");
+    selInput("#iTAlign", "text-align");
+    const bw = $("#iBW");
+    if (bw) bw.oninput = () => {
+      applyStyle("border-width", bw.value !== "" ? bw.value + "px" : null);
+      if (bw.value && cs.borderTopStyle === "none" && !$("#iBSty").value) {
+        $("#iBSty").value = "solid";
+        applyStyle("border-style", "solid");
+      }
+    };
+    selInput("#iBSty", "border-style");
+    const bc = $("#iBCol");
+    if (bc) bc.oninput = () => applyStyle("border-color", bc.value);
+    const sh = $("#iShadow");
+    if (sh) sh.onchange = () => {
+      const v = sh.value;
+      const old = $("#iShadowT");
+      if (old && v !== "custom") old.remove();
+      if (v === "custom") {
+        if (!$("#iShadowT")) {
+          const taEl = document.createElement("textarea");
+          taEl.id = "iShadowT";
+          taEl.style.minHeight = "40px";
+          taEl.style.fontSize = "11px";
+          taEl.style.marginTop = "6px";
+          taEl.value = curShadow || "0 4px 14px rgba(0,0,0,.25)";
+          sh.parentElement.appendChild(taEl);
+          taEl.oninput = () => applyStyle("box-shadow", taEl.value || null);
+          taEl.oninput();
+        }
+      } else applyStyle("box-shadow", v ? SHADOWS[v] : null);
+    };
+    const shT = $("#iShadowT");
+    if (shT) shT.oninput = () => applyStyle("box-shadow", shT.value || null);
+    const op = $("#iOpa");
+    if (op) op.oninput = () => {
+      $("#iOpaV").textContent = op.value + "%";
+      applyStyle("opacity", op.value === "100" ? null : String(op.value / 100));
     };
     $("#iDelete").onclick = () => {
       const s = srcEl();
@@ -2681,7 +2967,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     { sel: ".btnrow", title: "Add files", text: "＋ New creates a blank file, Upload imports .html files, Paste adds raw HTML. You can also drag & drop files straight onto the grid." },
     { sel: "#diskSection", title: "This computer", text: "Connect a real folder (Chrome/Edge) — opening a file there edits the actual files on disk. Sites split across HTML, CSS and JS files work too: Hypershelf bundles them for editing and Save writes each file back." },
     { sel: ".side-footer", title: "Backups, theme & this tour", text: "Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too." },
-    { sel: "#grid .card", title: "The editor", text: "Open any file: Interact runs it live, Edit lets you click, restyle, drag and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat." }
+    { sel: "#grid .card", title: "The editor", text: "Open any file: Interact runs it live, Edit lets you click, restyle, drag, resize and delete elements, ‹/› Code shows the source, 🎨 Colors rethemes the whole file at once, ⌛ History keeps a snapshot of every Save, and 🤖 AI round-trips the file through any AI chat." }
   ];
   var tourI = -1;
   function startTour() {
