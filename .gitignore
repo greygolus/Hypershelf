@@ -4,4 +4,5 @@ _Hypershelf (Project Home).md
 .vercel
 .env*
 .build/
+dist/
 node_modules/

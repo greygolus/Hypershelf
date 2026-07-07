@@ -29,5 +29,7 @@ if (!out.trimEnd().endsWith('</html>')) throw new Error('output does not end wit
 fs.writeFileSync('.build/check.js', out.slice(start, bEnd));
 execSync('node --check .build/check.js', { stdio: 'inherit' });
 
-fs.writeFileSync('Hypershelf.html', out);
-console.log('Built Hypershelf.html —', out.length, 'bytes');
+fs.writeFileSync('Hypershelf.html', out);          // local single-file artifact (open via file://)
+fs.mkdirSync('dist', { recursive: true });
+fs.writeFileSync('dist/index.html', out);          // what Vercel serves
+console.log('Built Hypershelf.html + dist/index.html —', out.length, 'bytes');
