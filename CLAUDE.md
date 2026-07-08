@@ -28,12 +28,22 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - `src/welcome.js` — the `WELCOME` playground HTML constant (own module so both `main.js` seed and `library.js` "＋ Example file" button import it without a circular dep)
 - `src/share.js` — share links: deflate+base64url a `{n,h}` payload into the URL hash (`#s=…`), incoming-link confirm modal, 🔗 toolbar + card-menu wiring
 - `src/slides.js` — deck-aware slide filmstrip: detection, thumbnails, add/duplicate/delete/move ops, Insert "Slide" entry hook
+- `src/gradient.js` — gradient parse/serialize (first gradient in a background-image, other layers preserved) + color helpers (`normRGB` probe-span, `withAlpha`, `darken`)
 - `src/main.js` — init, Welcome seed, analytics injection, and **`window.hs`** — the deliberate debug/test handle (the bundle keeps everything else off the global scope; automated tests drive the app through `hs.*`)
 
 **Regenerate the Welcome file:** `library.js#addWelcomeFile()` adds a fresh copy of `WELCOME` to the shelf and opens it — wired to `#btnWelcome` (sidebar footer "📚 Add example file") and `#btnWelcome2` (empty-shelf state). Mirrors disk mode's `createExampleSite`.
 
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
+
+**Added in v1.13 (July 8 2026) — gradient editor in the inspector:**
+- **Why**: gradients are everywhere in AI-generated files; the inspector's Background control wrote `background-color`, which is invisible under a gradient's `background-image` (or wiped it via shorthand) — "doesn't work or replaces it with a solid".
+- **Detection**: `renderInspector` runs `parseGradient(cs.backgroundImage)` (computed style — shorthand already resolved, colors normalized to rgb()). If it parses, the Background field is replaced by a **gradient editor**: live preview bar, one row per stop (color input + position text + ⍺ badge when the stop has alpha), type select (linear/radial), angle input (linear only), ＋ stop / → solid / reset.
+- **Every change routes through `applyStyle('background-image', …)`** — scope-picker aware (a scoped ⤳ writes ONE CSS rule hitting all matches — verified on the three .badge chips) and undoable. `→ solid` sets `background-image:none` + `background-color:<first stop>`; reset clears the override back to the file's own CSS.
+- **Solid backgrounds get a ⤳ grad button** — converts to `linear-gradient(135deg, base, darken(base,.55))` (transparent backgrounds seed from brand cyan).
+- **Alpha is preserved per stop**: editing a stop's color keeps its original opacity (`withAlpha`) — a `transparent 65%` fade stop stays a fade. `normRGB` parses any CSS color by assigning it to a hidden probe span and reading computed style.
+- **Parser safety**: `parseGradient` handles linear/radial/repeating, `to right`/`deg` angles, `circle at X Y` shapes, multi-layer background-images (`before`/`after` kept verbatim, only the first gradient edited), nested-paren-aware top-level comma split. It returns `null` — editor stays plain, value untouched — for anything it can't faithfully round-trip: `var()`, `color-mix()`, unknown identifiers (validated against `normRGB`). Never guess: a wrong serialize corrupts user CSS.
+- 🎨 Colors panel already handled gradient stop colors as individual swatches (they're plain color tokens in CSS regions) — unchanged.
 
 **Added in v1.12 (July 8 2026) — deck-aware editor (slides filmstrip):**
 - **One editor, not two apps** (decided with Grey): a file counts as a **deck** when `state.cur.html` has ≥2 `<section>` elements (`isDeck`, regex count — same slide rule as Present). Only then do the 🎞 Slides toolbar button, the filmstrip, and the Insert "Slide" entry exist; documents see none of it.

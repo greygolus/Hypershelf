@@ -145,6 +145,16 @@
   #modal .mrow input,#modal .mrow select{flex:1}
   #modal .mbtns{display:flex;justify-content:flex-end;gap:8px}
 
+  /* gradient editor (inspector Background) */
+  .gprev{height:26px;border-radius:7px;border:1px solid var(--border);margin-bottom:7px}
+  .gstop{margin-bottom:5px}
+  .gstop .gpos{width:58px;font-size:11px;padding:4px 6px}
+  .gstop .gdel{padding:2px 7px}
+  .gstop .gdel[disabled]{opacity:.35;cursor:default}
+  .gctl{margin-top:6px;display:flex;gap:6px}
+  .gctl button{flex:1;font-size:11.5px;padding:4px 6px}
+  .gctl input[type=number]{width:50%}
+
   /* slide filmstrip (decks only) */
   #btnSlides.off{display:none}
   #slidePanel{width:196px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);

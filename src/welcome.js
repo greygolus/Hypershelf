@@ -53,6 +53,8 @@ export const WELCOME=`<!DOCTYPE html>
     <span class="try">give the resize box a <b>glow</b> shadow from Border &amp; effects.</span></div>
   <div class="tip"><b>🎨 Colors</b> (top bar) lists every color and font in this file with usage counts.
     <span class="try">open it, click a swatch row, and drag the sliders — the whole page recolors live; release to apply.</span></div>
+  <div class="tip"><b>Gradients</b> — select an element with a gradient background and the inspector shows every color stop, the angle, and the type, all editable. Any solid background becomes a gradient with the <b>⤳ grad</b> button.
+    <span class="try">select the big banner at the top of this page — it's a radial gradient. Change its first stop.</span></div>
   <div class="tip"><b>Built-in fonts</b> — the 🅰 button offers 14 font stacks that render on any machine, no font files needed.
     <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from 🎨 Colors.</span></div>
 

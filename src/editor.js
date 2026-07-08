@@ -6,6 +6,7 @@ import { applyAssetCache, saveDiskProject } from './disk.js';
 import { histGo, histInit, histPush, pushVersion, verKey } from './history.js';
 import { closeThemePanel } from './colors.js';
 import { openFontMenu } from './fonts.js';
+import { parseGradient, serializeGradient, normRGB, withAlpha, darken } from './gradient.js';
 
 /* ======================= editor ======================= */
 function setDirty(d){state.dirty=d;$('#dirtyDot').classList.toggle('show',d)}
@@ -606,6 +607,8 @@ function renderInspector(el){
   const desc=el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+
     (el.classList.length?'.'+[...el.classList].join('.'):'');
   const colHex=rgbToHex(cs.color),bgHex=rgbToHex(cs.backgroundColor);
+  /* gradient backgrounds get their own editor — background-color is invisible under them */
+  const grad=parseGradient(cs.backgroundImage);
   const stv=p=>el.style.getPropertyValue(p);
   const num=v=>{const n=parseFloat(v);return isNaN(n)?'':String(n)};
   const opt=(vals,cur)=>vals.map(v=>
@@ -641,10 +644,31 @@ function renderInspector(el){
       <div class="colorrow"><input type="color" id="iColor" value="${colHex||'#000000'}">
         <span class="val" id="iColorV">${colHex||'transparent'}</span>
         <button id="iColorX" title="Remove override">reset</button></div></div>
-    <div class="field"><label>Background</label>
+    ${grad?`<div class="field"><label>Background gradient</label>
+      <div class="gprev" style="background:${esc(serializeGradient({...grad,before:'',after:''}))}"></div>
+      <div id="iGStops">${grad.stops.map((st,i)=>{const c=normRGB(st.color)||{hex:'#000000',a:1};
+        return`<div class="colorrow gstop" data-gi="${i}">
+          <input type="color" value="${c.hex}">
+          <input type="text" class="gpos" value="${esc(st.pos)}" placeholder="auto" title="stop position, e.g. 40%">
+          ${c.a<1?`<span class="val" title="this stop keeps its transparency">${Math.round(c.a*100)}%⍺</span>`:''}
+          <button class="gdel" title="Remove stop"${grad.stops.length<=2?' disabled':''}>✕</button></div>`}).join('')}
+      </div>
+      <div class="boxrow gctl">
+        <select id="iGType" style="width:50%">
+          <option value="linear"${grad.type==='linear'?' selected':''}>linear</option>
+          <option value="radial"${grad.type==='radial'?' selected':''}>radial</option></select>
+        ${grad.type==='linear'?`<input type="number" id="iGAng" step="15" value="${parseFloat(grad.angle)||180}" title="angle in degrees">`:''}
+      </div>
+      <div class="boxrow gctl">
+        <button id="iGAdd" title="Add a color stop">＋ stop</button>
+        <button id="iGSolid" title="Replace the gradient with its first color">→ solid</button>
+        <button id="iGX" title="Remove override">reset</button>
+      </div></div>`
+    :`<div class="field"><label>Background</label>
       <div class="colorrow"><input type="color" id="iBg" value="${bgHex||'#ffffff'}">
         <span class="val" id="iBgV">${bgHex||'transparent'}</span>
-        <button id="iBgX" title="Remove override">reset</button></div></div>
+        <button id="iGradMk" title="Turn this background into a gradient">⤳ grad</button>
+        <button id="iBgX" title="Remove override">reset</button></div></div>`}
     <div class="field"><label>Font family</label>
       <div class="fontrow"><input type="text" id="iFont" list="fontList" value="${esc(el.style.fontFamily||'')}"
         placeholder="${esc(cs.fontFamily.split(',')[0].replace(/"/g,''))}">
@@ -723,8 +747,44 @@ function renderInspector(el){
     el.textContent=iText.value;s.textContent=iText.value;scheduleSerialize()};
   $('#iColor').oninput=e=>{applyStyle('color',e.target.value);$('#iColorV').textContent=e.target.value};
   $('#iColorX').onclick=()=>{applyStyle('color',null);renderInspector(el)};
-  $('#iBg').oninput=e=>{applyStyle('background-color',e.target.value);$('#iBgV').textContent=e.target.value};
-  $('#iBgX').onclick=()=>{applyStyle('background-color',null);renderInspector(el)};
+  if(grad){
+    const gCommit=()=>{applyStyle('background-image',serializeGradient(grad));
+      const p=insp.querySelector('.gprev');
+      if(p)p.style.background=serializeGradient({...grad,before:'',after:''});};
+    insp.querySelectorAll('.gstop').forEach(row=>{
+      const gi=+row.dataset.gi;
+      const orig=normRGB(grad.stops[gi].color)||{hex:'#000000',a:1};
+      row.querySelector('input[type=color]').oninput=e=>{
+        grad.stops[gi].color=withAlpha(e.target.value,orig.a);gCommit()};
+      row.querySelector('.gpos').onchange=e=>{
+        grad.stops[gi].pos=e.target.value.trim();gCommit()};
+      row.querySelector('.gdel').onclick=()=>{
+        grad.stops.splice(gi,1);gCommit();renderInspector(el)};
+    });
+    $('#iGType').onchange=e=>{
+      grad.type=e.target.value;
+      if(grad.type==='radial'){grad.shape=grad.shape||'circle';grad.angle=''}
+      else{grad.angle=grad.angle||'135deg';grad.shape=''}
+      gCommit();renderInspector(el)};
+    const ang=$('#iGAng');
+    if(ang)ang.oninput=()=>{grad.angle=(ang.value||0)+'deg';gCommit()};
+    $('#iGAdd').onclick=()=>{
+      grad.stops.push({color:grad.stops[grad.stops.length-1].color,pos:''});
+      gCommit();renderInspector(el)};
+    $('#iGSolid').onclick=()=>{
+      const c=normRGB(grad.stops[0].color);
+      applyStyle('background-image','none');
+      applyStyle('background-color',c?c.hex:'#ffffff');
+      renderInspector(el)};
+    $('#iGX').onclick=()=>{applyStyle('background-image',null);renderInspector(el)};
+  }else{
+    $('#iBg').oninput=e=>{applyStyle('background-color',e.target.value);$('#iBgV').textContent=e.target.value};
+    $('#iBgX').onclick=()=>{applyStyle('background-color',null);renderInspector(el)};
+    $('#iGradMk').onclick=()=>{
+      const base=bgHex||'#54C8FF'; /* transparent backgrounds start from the brand cyan */
+      applyStyle('background-image',`linear-gradient(135deg, ${base}, ${darken(base,.55)})`);
+      renderInspector(el)};
+  }
   $('#iFont').onchange=e=>applyStyle('font-family',e.target.value||null);
   $('#iFontPick').onclick=e=>{e.preventDefault();
     openFontMenu(e.target,stack=>{$('#iFont').value=stack;applyStyle('font-family',stack)})};
