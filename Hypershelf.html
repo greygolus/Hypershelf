@@ -291,6 +291,28 @@
   .fontrow button{flex-shrink:0;padding:4px 9px}
   input[type=range]{accent-color:var(--accent);width:100%;padding:0}
 
+  /* ---------- ＋ Insert palette ---------- */
+  #insertMenu{position:fixed;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    box-shadow:0 14px 44px rgba(0,0,0,.55);width:220px;padding:5px;display:flex;flex-direction:column}
+  #insertMenu button{display:flex;align-items:center;gap:10px;background:none;border:none;
+    text-align:left;padding:8px 10px;border-radius:8px;font-size:13px}
+  #insertMenu button:hover{background:var(--panel2)}
+  #insertMenu .iic{width:20px;text-align:center}
+  #insertMenu .ihint{font-size:10.5px;color:var(--muted);padding:7px 10px 5px;border-top:1px solid var(--border);margin-top:4px}
+
+  /* ---------- template gallery ---------- */
+  .tplgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .tpl{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;
+    background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .tpl:hover{border-color:var(--accent)}
+  .tpl .tplic{font-size:22px}
+  .tpl b{font-size:13.5px}
+  .tpl .tpld{font-size:11.5px;color:var(--muted);line-height:1.4}
+
+  /* ---------- presenter mode ---------- */
+  #presentOv{position:fixed;inset:0;z-index:600;background:#000}
+  #presentOv iframe{width:100%;height:100%;border:0}
+
   /* ---------- built-in font stack picker ---------- */
   #fontMenu{position:fixed;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:12px;
     box-shadow:0 14px 44px rgba(0,0,0,.55);max-height:340px;overflow-y:auto;width:300px;padding:5px;
@@ -361,7 +383,9 @@
           <button data-mmode="interact" class="active" title="Use the page live — scripts, buttons, and links work">🖱 Interact</button>
           <button data-mmode="edit" title="Click any element to edit it">✎ Edit</button>
         </div>
+        <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
         <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
+        <button id="btnPresent" title="Present fullscreen — ←/→ to move between slides, Esc to exit">▶</button>
         <select id="widthSel" title="Preview width">
           <option value="">Full width</option>
           <option value="1024">1024 px</option>
@@ -401,6 +425,7 @@
   </datalist>
   <input type="file" id="fileInput" accept=".html,.htm,.txt" multiple hidden>
   <input type="file" id="libInput" accept=".json" hidden>
+  <input type="file" id="imgInput" accept="image/*" hidden>
 </div>
 <script>
 (() => {
@@ -1199,7 +1224,7 @@
         });
       });
       const st = disp.createElement("style");
-      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-dragging]{opacity:.55!important;outline:2px dashed #4cd97b!important;outline-offset:-1px}#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}";
+      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-dragging]{opacity:.55!important;outline:2px dashed #4cd97b!important;outline-offset:-1px}[contenteditable]{outline:2px solid #4cd97b!important;outline-offset:-1px;cursor:text!important}#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}";
       disp.head.appendChild(st);
       fr.onload = () => attachEditHandlers(fr.contentDocument);
       wrap.appendChild(fr);
@@ -1238,9 +1263,67 @@
     if (!doc || !doc.body) return;
     dispDoc = doc;
     const hbox = ensureHandles(doc);
-    let drag = null, justDragged = false, rz = null;
+    let drag = null, justDragged = false, rz = null, editingEl = null;
+    const onInlineInput = () => {
+      if (!editingEl) return;
+      const s = srcEl();
+      if (!s) return;
+      s.textContent = editingEl.textContent;
+      const it = $("#iText");
+      if (it) it.value = editingEl.textContent;
+      scheduleSerialize();
+      positionHandles();
+    };
+    const inlineKeys = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        endInlineEdit();
+      }
+    };
+    function endInlineEdit() {
+      const t = editingEl;
+      if (!t) return;
+      editingEl = null;
+      t.removeEventListener("input", onInlineInput);
+      t.removeEventListener("keydown", inlineKeys);
+      t.removeEventListener("blur", endInlineEdit);
+      t.removeAttribute("contenteditable");
+      flushSerialize();
+    }
+    function startInlineEdit(t, ev) {
+      if (editingEl === t) return;
+      endInlineEdit();
+      if (state.selEl !== t) selectDisplayEl(t);
+      editingEl = t;
+      try {
+        t.contentEditable = "plaintext-only";
+      } catch {
+        t.contentEditable = "true";
+      }
+      t.focus();
+      try {
+        const rng = doc.caretRangeFromPoint(ev.clientX, ev.clientY);
+        if (rng) {
+          const sel = doc.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(rng);
+        }
+      } catch {
+      }
+      t.addEventListener("input", onInlineInput);
+      t.addEventListener("keydown", inlineKeys);
+      t.addEventListener("blur", endInlineEdit);
+    }
+    doc.body.addEventListener("dblclick", (e) => {
+      const t = e.target.closest("[" + HS + "]");
+      if (!t || t.children.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      startInlineEdit(t, e);
+    }, true);
     doc.body.addEventListener("mouseover", (e) => {
-      if (rz || drag && drag.active) return;
+      if (rz || editingEl || drag && drag.active) return;
       doc.querySelectorAll("[data-hs-hover]").forEach((el) => el.removeAttribute("data-hs-hover"));
       const t = e.target.closest("[" + HS + "]");
       if (t) t.setAttribute("data-hs-hover", "");
@@ -1269,6 +1352,7 @@
       doc.getElementById("hsSize").style.display = "block";
     }, true);
     doc.body.addEventListener("mousedown", (e) => {
+      if (editingEl) return;
       const t = e.target.closest("[" + HS + "]");
       if (!t || t !== state.selEl) return;
       drag = {
@@ -1429,6 +1513,7 @@
       else drag = null;
     });
     doc.body.addEventListener("click", (e) => {
+      if (editingEl && (e.target === editingEl || editingEl.contains(e.target))) return;
       e.preventDefault();
       e.stopPropagation();
       if (justDragged) {
@@ -1445,7 +1530,10 @@
       if (k === "s") {
         e.preventDefault();
         saveCur();
-      } else if (k === "z") {
+        return;
+      }
+      if (editingEl) return;
+      if (k === "z") {
         e.preventDefault();
         histGo(e.shiftKey ? 1 : -1);
       } else if (k === "y") {
@@ -2018,6 +2106,78 @@
     scheduleSerialize();
     renderAttrs();
   }
+  async function insertHtmlAfterSelection(html) {
+    if (!state.cur) return;
+    if (state.mmode !== "edit") {
+      syncNow();
+      state.mmode = "edit";
+      updateModeUI();
+      renderFrame();
+    }
+    flushSerialize();
+    const tpl = state.srcDoc.createElement("template");
+    tpl.innerHTML = html;
+    const node = tpl.content.firstElementChild;
+    if (!node) return;
+    const s = srcEl();
+    if (s) s.after(node);
+    else state.srcDoc.body.appendChild(node);
+    const idx = [...state.srcDoc.querySelectorAll("body *")].indexOf(node);
+    state.cur.html = serializeSrc();
+    histPush(state.cur.html);
+    setDirty(true);
+    renderFrame();
+    refreshCodeText();
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 60));
+      if (dispDoc && dispDoc.body) {
+        const el = dispDoc.querySelector(`[${HS}="${idx}"]`);
+        if (el) {
+          selectDisplayEl(el, { scrollPage: true });
+          break;
+        }
+      }
+    }
+  }
+  var PRESENT_JS = "(function(){var s=[].slice.call(document.querySelectorAll('section'));if(s.length<2)s=[].slice.call(document.body.children).filter(function(el){return !/^(SCRIPT|STYLE)$/.test(el.tagName)});if(!s.length)return;var i=0;var hud=document.createElement('div');hud.style.cssText='position:fixed;right:14px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;font:12px system-ui;padding:5px 12px;border-radius:99px;z-index:2147483647;transition:opacity .5s';document.body.appendChild(hud);function go(n){i=Math.max(0,Math.min(s.length-1,n));s[i].scrollIntoView({behavior:'smooth'});hud.textContent=(i+1)+' / '+s.length+'   \\u2190 \\u2192   Esc';hud.style.opacity='1'}addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(i+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1)}else if(e.key==='Escape'){parent.postMessage('hs-exit-present','*')}});go(0);setTimeout(function(){hud.style.opacity='.35'},3000);})();";
+  $("#btnPresent").onclick = () => {
+    if (!state.cur) return;
+    syncNow();
+    let html = applyAssetCache(state.cur.html);
+    const inj = "<script>" + PRESENT_JS + "<\/script>";
+    html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, () => inj + "</body>") : html + inj;
+    const ov = document.createElement("div");
+    ov.id = "presentOv";
+    const fr = document.createElement("iframe");
+    fr.setAttribute("sandbox", "allow-scripts allow-modals allow-forms allow-popups");
+    fr.srcdoc = html;
+    fr.onload = () => {
+      try {
+        fr.contentWindow.focus();
+      } catch {
+      }
+    };
+    ov.appendChild(fr);
+    document.body.appendChild(ov);
+    const close = () => {
+      ov.remove();
+      removeEventListener("message", onMsg);
+      document.removeEventListener("fullscreenchange", onFs);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {
+      });
+    };
+    ov._close = close;
+    const onMsg = (ev) => {
+      if (ev.data === "hs-exit-present") close();
+    };
+    const onFs = () => {
+      if (!document.fullscreenElement) close();
+    };
+    addEventListener("message", onMsg);
+    if (ov.requestFullscreen)
+      ov.requestFullscreen().then(() => document.addEventListener("fullscreenchange", onFs)).catch(() => {
+      });
+  };
   function applyPreviewWidth() {
     const fr = $("#frameWrap iframe");
     if (!fr) return;
@@ -2694,8 +2854,10 @@ document.querySelectorAll('.card').forEach((card, i) => {
   <div class="tip"><b>🖱 Interact</b> runs the page live, scripts and all.
     <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
     <span class="try">click the button, then switch to ✎ Edit (top bar) and notice the page holds still.</span></div>
-  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right.
-    <span class="try">in Edit mode, click this sentence and rewrite it in the Text box.</span></div>
+  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
+    <span class="try">in Edit mode, double-click this sentence and just start typing.</span></div>
+  <div class="tip"><b>＋ Insert</b> (top bar) adds new elements — headings, buttons, lists, containers, columns, even images (embedded so the file stays self-contained).
+    <span class="try">select this card, hit ＋ Insert, and add a paragraph after it.</span></div>
 
   <h2 class="sec">Move · resize · multiply</h2>
   <div class="tip"><b>Drag to move</b> — a selected element can be dragged anywhere on the page.
@@ -2717,6 +2879,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
 
   <h2 class="sec">Source &amp; safety nets</h2>
   <div class="tip"><b>‹/› Code</b> shows the source side-by-side: clicking an element highlights its line, clicking a line selects the element. The panel edge drags to resize.</div>
+  <div class="tip"><b>▶ Present</b> plays any file fullscreen — each &lt;section&gt; is a slide, ← → to navigate. Try the Slide deck template under ＋ New.</div>
   <div class="tip"><b>Undo</b> (Ctrl+Z) covers everything; <b>⌛ History</b> keeps a snapshot of every Save with diffs and rollback; autosave recovers unsaved work after a crash.</div>
   <div class="tip"><b>🤖 AI</b> copies this file plus a ready-made prompt for any AI chat — paste the reply back and review a visual diff before accepting.
     <span class="try">click 🤖 AI, type "make the hero purple", copy, and paste it to your favorite AI.</span></div>
@@ -2728,6 +2891,154 @@ document.querySelectorAll('.card').forEach((card, i) => {
 </main>
 </body>
 </html>`;
+
+  // src/templates.js
+  var TEMPLATES = [
+    {
+      id: "blank",
+      emoji: "📄",
+      name: "Blank",
+      desc: "A clean page to start from nothing.",
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Untitled</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;line-height:1.6;color:#1b1f27;background:#ffffff}
+  h1{color:#1786c9}
+</style>
+</head>
+<body>
+<h1>Untitled</h1>
+<p>Start writing — double-click any text to edit it, or use ＋ Insert to add elements.</p>
+</body>
+</html>`
+    },
+    {
+      id: "doc",
+      emoji: "📝",
+      name: "Document",
+      desc: "Notes / write-up with headings, lists and quotes.",
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New document</title>
+<style>
+  body{font-family:Charter,'Bitstream Charter','Sitka Text',Cambria,serif;max-width:680px;
+    margin:70px auto;padding:0 24px;line-height:1.7;color:#22272e;background:#fbfaf7;font-size:17px}
+  h1{font-size:34px;margin:0 0 4px;color:#14324f}
+  .meta{color:#8a8f98;font-size:14px;font-family:system-ui,sans-serif;margin:0 0 34px}
+  h2{font-size:21px;color:#14324f;margin:38px 0 10px;border-bottom:1px solid #e3ded2;padding-bottom:6px}
+  blockquote{margin:20px 0;padding:12px 20px;border-left:3px solid #c9a227;background:#f4efe3;color:#5a5546;font-style:italic}
+  li{margin-bottom:6px}
+  strong{color:#14324f}
+</style>
+</head>
+<body>
+<h1>Document title</h1>
+<p class="meta">A subtitle, a date, or an author line.</p>
+<h2>First section</h2>
+<p>Double-click this paragraph to start writing. Use <strong>＋ Insert</strong> to add headings, lists, images and more.</p>
+<h2>Key points</h2>
+<ul>
+  <li>Everything lives in one portable HTML file.</li>
+  <li>The 🎨 Colors panel can retheme this whole document at once.</li>
+  <li>Every save keeps a version you can roll back to.</li>
+</ul>
+<blockquote>A quote or callout looks like this.</blockquote>
+</body>
+</html>`
+    },
+    {
+      id: "deck",
+      emoji: "🖥️",
+      name: "Slide deck",
+      desc: "Full-screen slides — present with the ▶ button.",
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New deck</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;color:#eceeed;background:#0b0d10}
+  section.slide{min-height:100vh;display:flex;flex-direction:column;justify-content:center;
+    padding:8vh 10vw;box-sizing:border-box}
+  .slide h1{font-size:8vh;margin:0 0 2vh;letter-spacing:.02em}
+  .slide h2{font-size:5.5vh;margin:0 0 4vh;color:#54C8FF}
+  .slide p,.slide li{font-size:3.1vh;line-height:1.55;color:#b9c2cc}
+  .slide li{margin-bottom:1.6vh}
+  .slide.title{background:radial-gradient(circle at 50% 130%,rgba(84,200,255,.3),transparent 60%),#0b0d10;
+    text-align:center;align-items:center}
+  .slide.accent{background:#101820}
+  .tagline{color:#54C8FF;font-size:3vh}
+</style>
+</head>
+<body>
+<section class="slide title">
+  <h1>Presentation title</h1>
+  <p class="tagline">A subtitle goes here — double-click any text to edit it.</p>
+</section>
+<section class="slide">
+  <h2>First point</h2>
+  <ul>
+    <li>Each &lt;section&gt; is one slide.</li>
+    <li>Duplicate a slide from the inspector to add more.</li>
+    <li>Hit ▶ Present and use ← → to navigate.</li>
+  </ul>
+</section>
+<section class="slide accent">
+  <h2>Thank you</h2>
+  <p>Made with Hypershelf.</p>
+</section>
+</body>
+</html>`
+    },
+    {
+      id: "landing",
+      emoji: "🚀",
+      name: "Landing page",
+      desc: "Hero, feature cards and a call to action.",
+      html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New landing page</title>
+<style>
+  body{margin:0;font-family:Avenir,Montserrat,Corbel,'URW Gothic',sans-serif;color:#1d2430;background:#f5f7f4;line-height:1.6}
+  .hero{text-align:center;padding:90px 24px 70px;background:radial-gradient(circle at 50% 130%,rgba(46,164,79,.18),transparent 60%),#ffffff;border-bottom:1px solid #e2e8dd}
+  .hero h1{font-size:46px;margin:0 0 12px;color:#173420}
+  .hero p{font-size:19px;color:#5c6b60;margin:0 0 30px}
+  .cta{display:inline-block;background:#2ea44f;color:#ffffff;text-decoration:none;font-weight:700;
+    padding:14px 34px;border-radius:10px;font-size:17px}
+  .features{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;padding:56px 24px;max-width:980px;margin:0 auto}
+  .feature{background:#ffffff;border:1px solid #e2e8dd;border-radius:14px;padding:24px;width:260px}
+  .feature h3{margin:0 0 8px;color:#173420}
+  .feature p{margin:0;font-size:14.5px;color:#5c6b60}
+  footer{text-align:center;padding:34px;color:#8a978d;font-size:13.5px;border-top:1px solid #e2e8dd}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>Your product name</h1>
+  <p>One sentence about why it matters. Double-click to make it yours.</p>
+  <a class="cta" href="#">Get started</a>
+</div>
+<div class="features">
+  <div class="feature"><h3>Feature one</h3><p>These three cards share the class .feature — restyle them all at once with the scope picker.</p></div>
+  <div class="feature"><h3>Feature two</h3><p>Drag cards to reorder them, or duplicate one to add a fourth.</p></div>
+  <div class="feature"><h3>Feature three</h3><p>Open 🎨 Colors to swap this page's whole palette in seconds.</p></div>
+</div>
+<footer>Built with Hypershelf — one self-contained HTML file.</footer>
+</body>
+</html>`
+    }
+  ];
 
   // src/library.js
   function visibleFiles() {
@@ -3007,28 +3318,27 @@ document.querySelectorAll('.card').forEach((card, i) => {
     await idb.put("files", f);
     return f;
   }
-  var BLANK = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Untitled</title>
-<style>
-  body{font-family:system-ui,sans-serif;max-width:720px;margin:60px auto;padding:0 24px;line-height:1.6;color:#1b1f27}
-  h1{color:#1786c9}
-</style>
-</head>
-<body>
-<h1>Untitled</h1>
-<p>Start writing…</p>
-</body>
-</html>`;
-  $("#btnNew").onclick = async () => {
-    const name = prompt("Name for the new file:", "Untitled.html");
-    if (name === null) return;
-    const f = await addFile(name || "Untitled.html", BLANK);
-    renderLibrary();
-    openFile(f.id);
+  $("#btnNew").onclick = () => {
+    showModal(`<h3>New file</h3>
+    <div class="mrow"><label>Name</label><input type="text" id="tplName" value="Untitled.html"></div>
+    <div class="tplgrid">${TEMPLATES.map((t) => `
+      <button class="tpl" data-tpl="${t.id}">
+        <span class="tplic">${t.emoji}</span><b>${esc(t.name)}</b>
+        <span class="tpld">${esc(t.desc)}</span>
+      </button>`).join("")}</div>
+    <div class="mbtns"><button id="mCancel">Cancel</button></div>`);
+    $("#tplName").focus();
+    $("#tplName").select();
+    $("#mCancel").onclick = hideModal;
+    $("#modal").querySelectorAll(".tpl").forEach((b) => b.onclick = async () => {
+      const t = TEMPLATES.find((x) => x.id === b.dataset.tpl);
+      const name = $("#tplName").value.trim() || "Untitled.html";
+      hideModal();
+      const f = await addFile(name, t.html);
+      state.filter.disk = false;
+      renderLibrary();
+      openFile(f.id);
+    });
   };
   async function addWelcomeFile() {
     const f = await addFile("Welcome to Hypershelf.html", WELCOME, { tags: ["guide"] });
@@ -3337,6 +3647,63 @@ document.querySelectorAll('.card').forEach((card, i) => {
   }
   $("#btnTour").onclick = startTour;
 
+  // src/insert.js
+  var INSERT_ITEMS = [
+    { ic: "🔠", name: "Heading", html: "<h2>New heading</h2>" },
+    { ic: "📃", name: "Paragraph", html: "<p>New paragraph — double-click to edit this text.</p>" },
+    { ic: "🔘", name: "Button", html: "<button>Click me</button>" },
+    { ic: "🔗", name: "Link", html: '<a href="#">New link</a>' },
+    { ic: "📋", name: "List", html: "<ul><li>First item</li><li>Second item</li></ul>" },
+    { ic: "🖼️", name: "Image…", img: true },
+    { ic: "📦", name: "Container", html: '<div style="padding:18px"><p>New section — drop elements in here.</p></div>' },
+    { ic: "🀫", name: "Two columns", html: '<div style="display:flex;gap:16px;align-items:flex-start"><div style="flex:1"><p>Left column</p></div><div style="flex:1"><p>Right column</p></div></div>' },
+    { ic: "➖", name: "Divider", html: "<hr>" }
+  ];
+  var menuEl2 = null;
+  function closeInsertMenu() {
+    if (menuEl2) {
+      menuEl2.remove();
+      menuEl2 = null;
+      document.removeEventListener("mousedown", onOutside2, true);
+    }
+  }
+  function onOutside2(e) {
+    if (menuEl2 && !menuEl2.contains(e.target)) closeInsertMenu();
+  }
+  $("#btnInsert").onclick = (e) => {
+    if (!state.cur) return;
+    if (menuEl2) {
+      closeInsertMenu();
+      return;
+    }
+    menuEl2 = document.createElement("div");
+    menuEl2.id = "insertMenu";
+    menuEl2.innerHTML = INSERT_ITEMS.map((it, i) => `<button data-i="${i}"><span class="iic">${it.ic}</span><span>${it.name}</span></button>`).join("") + '<div class="ihint">Inserts after the selected element — or at the end of the page.</div>';
+    document.body.appendChild(menuEl2);
+    const r = e.target.getBoundingClientRect();
+    menuEl2.style.top = r.bottom + 6 + "px";
+    menuEl2.style.left = Math.max(8, Math.min(r.left, innerWidth - 240)) + "px";
+    menuEl2.querySelectorAll("button").forEach((b) => b.onclick = () => {
+      const it = INSERT_ITEMS[+b.dataset.i];
+      closeInsertMenu();
+      if (it.img) $("#imgInput").click();
+      else insertHtmlAfterSelection(it.html);
+    });
+    setTimeout(() => document.addEventListener("mousedown", onOutside2, true), 0);
+  };
+  $("#imgInput").onchange = (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    if (f.size > 2 * 1024 * 1024)
+      toast("Heads up: " + (f.size / 1024 / 1024).toFixed(1) + " MB image — it gets embedded into the file");
+    const rd = new FileReader();
+    rd.onload = () => insertHtmlAfterSelection(
+      `<img src="${rd.result}" alt="${f.name.replace(/"/g, "")}" style="max-width:100%">`
+    );
+    rd.readAsDataURL(f);
+  };
+
   // src/main.js
   window.hs = {
     state,
@@ -3355,6 +3722,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     saveDraft,
     setCodeHighlight,
     refreshCodeText,
+    insertHtmlAfterSelection,
     listDisk,
     bundleDiskHtml,
     preloadDiskAssets,

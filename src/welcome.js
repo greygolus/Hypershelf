@@ -33,8 +33,10 @@ export const WELCOME=`<!DOCTYPE html>
   <div class="tip"><b>🖱 Interact</b> runs the page live, scripts and all.
     <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
     <span class="try">click the button, then switch to ✎ Edit (top bar) and notice the page holds still.</span></div>
-  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right.
-    <span class="try">in Edit mode, click this sentence and rewrite it in the Text box.</span></div>
+  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
+    <span class="try">in Edit mode, double-click this sentence and just start typing.</span></div>
+  <div class="tip"><b>＋ Insert</b> (top bar) adds new elements — headings, buttons, lists, containers, columns, even images (embedded so the file stays self-contained).
+    <span class="try">select this card, hit ＋ Insert, and add a paragraph after it.</span></div>
 
   <h2 class="sec">Move · resize · multiply</h2>
   <div class="tip"><b>Drag to move</b> — a selected element can be dragged anywhere on the page.
@@ -56,6 +58,7 @@ export const WELCOME=`<!DOCTYPE html>
 
   <h2 class="sec">Source &amp; safety nets</h2>
   <div class="tip"><b>‹/› Code</b> shows the source side-by-side: clicking an element highlights its line, clicking a line selects the element. The panel edge drags to resize.</div>
+  <div class="tip"><b>▶ Present</b> plays any file fullscreen — each &lt;section&gt; is a slide, ← → to navigate. Try the Slide deck template under ＋ New.</div>
   <div class="tip"><b>Undo</b> (Ctrl+Z) covers everything; <b>⌛ History</b> keeps a snapshot of every Save with diffs and rollback; autosave recovers unsaved work after a crash.</div>
   <div class="tip"><b>🤖 AI</b> copies this file plus a ready-made prompt for any AI chat — paste the reply back and review a visual diff before accepting.
     <span class="try">click 🤖 AI, type "make the hero purple", copy, and paste it to your favorite AI.</span></div>

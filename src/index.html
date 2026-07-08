@@ -67,7 +67,9 @@
           <button data-mmode="interact" class="active" title="Use the page live — scripts, buttons, and links work">🖱 Interact</button>
           <button data-mmode="edit" title="Click any element to edit it">✎ Edit</button>
         </div>
+        <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
         <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
+        <button id="btnPresent" title="Present fullscreen — ←/→ to move between slides, Esc to exit">▶</button>
         <select id="widthSel" title="Preview width">
           <option value="">Full width</option>
           <option value="1024">1024 px</option>
@@ -107,6 +109,7 @@
   </datalist>
   <input type="file" id="fileInput" accept=".html,.htm,.txt" multiple hidden>
   <input type="file" id="libInput" accept=".json" hidden>
+  <input type="file" id="imgInput" accept="image/*" hidden>
 </div>
 <script type="module" src="./main.js"></script>
 </body>

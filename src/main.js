@@ -10,6 +10,7 @@ import './diff.js';
 import './ai.js';
 import './colors.js';
 import './tour.js';
+import './insert.js';
 import { $ } from './utils.js';
 import { idb, openDB } from './db.js';
 import { state } from './state.js';
@@ -17,7 +18,7 @@ import { addFile, renderLibrary } from './library.js';
 import { activeDisk } from './disk.js';
 import { listDisk, bundleDiskHtml, preloadDiskAssets, applyAssetCache, saveDiskProject, resolveRel, createExampleSite, openDiskFile } from './disk.js';
 import { startTour } from './tour.js';
-import { renderFrame, syncNow, setDirty, saveCur, flushSerialize, selectDisplayEl, saveDraft, setCodeHighlight, refreshCodeText } from './editor.js';
+import { renderFrame, syncNow, setDirty, saveCur, flushSerialize, selectDisplayEl, saveDraft, setCodeHighlight, refreshCodeText, insertHtmlAfterSelection } from './editor.js';
 import { hist, histGo, histPush, verKey, pushVersion } from './history.js';
 import { diffLines, renderDiffHTML } from './diff.js';
 import { extractHtml } from './ai.js';
@@ -27,7 +28,7 @@ import { WELCOME } from './welcome.js';
 /* console/debug handle — the bundle keeps internals out of the global scope,
    so this is the deliberate window for debugging and automated tests */
 window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
-  renderFrame,syncNow,setDirty,saveCur,flushSerialize,selectDisplayEl,saveDraft,setCodeHighlight,refreshCodeText,
+  renderFrame,syncNow,setDirty,saveCur,flushSerialize,selectDisplayEl,saveDraft,setCodeHighlight,refreshCodeText,insertHtmlAfterSelection,
   listDisk,bundleDiskHtml,preloadDiskAssets,applyAssetCache,saveDiskProject,resolveRel,createExampleSite,openDiskFile,activeDisk,renderLibrary,
   diffLines,renderDiffHTML,extractHtml,
   scanTheme,applyColorSwap,renderThemePanel,closeThemePanel,startTour,

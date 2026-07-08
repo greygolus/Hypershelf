@@ -126,6 +126,7 @@ function renderFrame(){
     st.textContent='[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}'+
       '[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}'+
       '[data-hs-dragging]{opacity:.55!important;outline:2px dashed #4cd97b!important;outline-offset:-1px}'+
+      '[contenteditable]{outline:2px solid #4cd97b!important;outline-offset:-1px;cursor:text!important}'+
       '#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}'+
       '#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}'+
       '#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}'+
@@ -167,9 +168,50 @@ function attachEditHandlers(doc){
   dispDoc=doc;
   const hbox=ensureHandles(doc);
   /* drag the SELECTED element to move it before/after any other element */
-  let drag=null,justDragged=false,rz=null;
+  let drag=null,justDragged=false,rz=null,editingEl=null;
+  /* ---------- inline text editing (double-click a text element) ---------- */
+  const onInlineInput=()=>{
+    if(!editingEl)return;
+    const s=srcEl();if(!s)return;
+    s.textContent=editingEl.textContent;
+    const it=$('#iText');if(it)it.value=editingEl.textContent;
+    scheduleSerialize();positionHandles();
+  };
+  const inlineKeys=e=>{
+    if(e.key==='Escape'){e.preventDefault();e.stopPropagation();endInlineEdit()}
+  };
+  function endInlineEdit(){
+    const t=editingEl;if(!t)return;editingEl=null;
+    t.removeEventListener('input',onInlineInput);
+    t.removeEventListener('keydown',inlineKeys);
+    t.removeEventListener('blur',endInlineEdit);
+    t.removeAttribute('contenteditable');
+    flushSerialize();
+  }
+  function startInlineEdit(t,ev){
+    if(editingEl===t)return;
+    endInlineEdit();
+    if(state.selEl!==t)selectDisplayEl(t);
+    editingEl=t;
+    try{t.contentEditable='plaintext-only'}catch{t.contentEditable='true'}
+    t.focus();
+    /* put the caret where the user double-clicked */
+    try{
+      const rng=doc.caretRangeFromPoint(ev.clientX,ev.clientY);
+      if(rng){const sel=doc.getSelection();sel.removeAllRanges();sel.addRange(rng)}
+    }catch{}
+    t.addEventListener('input',onInlineInput);
+    t.addEventListener('keydown',inlineKeys);
+    t.addEventListener('blur',endInlineEdit);
+  }
+  doc.body.addEventListener('dblclick',e=>{
+    const t=e.target.closest('['+HS+']');
+    if(!t||t.children.length)return; /* text leaves only */
+    e.preventDefault();e.stopPropagation();
+    startInlineEdit(t,e);
+  },true);
   doc.body.addEventListener('mouseover',e=>{
-    if(rz||(drag&&drag.active))return;
+    if(rz||editingEl||(drag&&drag.active))return;
     doc.querySelectorAll('[data-hs-hover]').forEach(el=>el.removeAttribute('data-hs-hover'));
     const t=e.target.closest('['+HS+']');if(t)t.setAttribute('data-hs-hover','')},true);
   doc.body.addEventListener('mouseout',()=>{
@@ -188,6 +230,7 @@ function attachEditHandlers(doc){
     doc.getElementById('hsSize').style.display='block';
   },true);
   doc.body.addEventListener('mousedown',e=>{
+    if(editingEl)return; /* typing, not dragging */
     const t=e.target.closest('['+HS+']');
     if(!t||t!==state.selEl)return; /* only the selected element is draggable */
     drag={el:t,x:e.clientX,y:e.clientY,active:false,moved:false,prevPE:'',
@@ -332,6 +375,8 @@ function attachEditHandlers(doc){
   },true);
   doc.addEventListener('mouseleave',()=>{if(drag&&drag.active)endDrag(true);else drag=null});
   doc.body.addEventListener('click',e=>{
+    /* while editing text, clicks inside the element place the caret */
+    if(editingEl&&(e.target===editingEl||editingEl.contains(e.target)))return;
     e.preventDefault();e.stopPropagation();
     if(justDragged){justDragged=false;return}
     const t=e.target.closest('['+HS+']');if(!t)return;
@@ -339,8 +384,9 @@ function attachEditHandlers(doc){
   doc.addEventListener('keydown',e=>{ /* shortcuts still work when focus is inside the page */
     if(!(e.ctrlKey||e.metaKey))return;
     const k=e.key.toLowerCase();
-    if(k==='s'){e.preventDefault();saveCur()}
-    else if(k==='z'){e.preventDefault();histGo(e.shiftKey?1:-1)}
+    if(k==='s'){e.preventDefault();saveCur();return}
+    if(editingEl)return; /* native undo inside the contenteditable */
+    if(k==='z'){e.preventDefault();histGo(e.shiftKey?1:-1)}
     else if(k==='y'){e.preventDefault();histGo(1)}
   });
 }
@@ -766,6 +812,71 @@ function commitAttr(oldName,name,val){
   scheduleSerialize();renderAttrs();
 }
 
+/* ======================= insert elements ======================= */
+async function insertHtmlAfterSelection(html){
+  if(!state.cur)return;
+  if(state.mmode!=='edit'){syncNow();state.mmode='edit';updateModeUI();renderFrame()}
+  flushSerialize();
+  const tpl=state.srcDoc.createElement('template');
+  tpl.innerHTML=html;
+  const node=tpl.content.firstElementChild;
+  if(!node)return;
+  const s=srcEl();
+  if(s)s.after(node);else state.srcDoc.body.appendChild(node);
+  /* document-order index survives renderFrame's re-annotation */
+  const idx=[...state.srcDoc.querySelectorAll('body *')].indexOf(node);
+  state.cur.html=serializeSrc();histPush(state.cur.html);setDirty(true);
+  renderFrame();refreshCodeText();
+  /* select the new element once the fresh display iframe is ready */
+  for(let i=0;i<20;i++){
+    await new Promise(r=>setTimeout(r,60));
+    if(dispDoc&&dispDoc.body){
+      const el=dispDoc.querySelector(`[${HS}="${idx}"]`);
+      if(el){selectDisplayEl(el,{scrollPage:true});break}
+    }
+  }
+}
+
+/* ======================= presenter mode ======================= */
+const PRESENT_JS="(function(){"+
+  "var s=[].slice.call(document.querySelectorAll('section'));"+
+  "if(s.length<2)s=[].slice.call(document.body.children).filter(function(el){return !/^(SCRIPT|STYLE)$/.test(el.tagName)});"+
+  "if(!s.length)return;var i=0;"+
+  "var hud=document.createElement('div');"+
+  "hud.style.cssText='position:fixed;right:14px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;font:12px system-ui;padding:5px 12px;border-radius:99px;z-index:2147483647;transition:opacity .5s';"+
+  "document.body.appendChild(hud);"+
+  "function go(n){i=Math.max(0,Math.min(s.length-1,n));s[i].scrollIntoView({behavior:'smooth'});"+
+  "hud.textContent=(i+1)+' / '+s.length+'   \\u2190 \\u2192   Esc';hud.style.opacity='1'}"+
+  "addEventListener('keydown',function(e){"+
+  "if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(i+1)}"+
+  "else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1)}"+
+  "else if(e.key==='Escape'){parent.postMessage('hs-exit-present','*')}});"+
+  "go(0);setTimeout(function(){hud.style.opacity='.35'},3000);"+
+  "})();";
+$('#btnPresent').onclick=()=>{
+  if(!state.cur)return;
+  syncNow();
+  let html=applyAssetCache(state.cur.html);
+  const inj='<script>'+PRESENT_JS+'<'+'/script>';
+  html=/<\/body>/i.test(html)?html.replace(/<\/body>/i,()=>inj+'</body>'):html+inj;
+  const ov=document.createElement('div');ov.id='presentOv';
+  const fr=document.createElement('iframe');
+  fr.setAttribute('sandbox','allow-scripts allow-modals allow-forms allow-popups');
+  fr.srcdoc=html;
+  fr.onload=()=>{try{fr.contentWindow.focus()}catch{}};
+  ov.appendChild(fr);document.body.appendChild(ov);
+  const close=()=>{ov.remove();
+    removeEventListener('message',onMsg);
+    document.removeEventListener('fullscreenchange',onFs);
+    if(document.fullscreenElement)document.exitFullscreen().catch(()=>{})};
+  ov._close=close; /* the global Escape handler uses this */
+  const onMsg=ev=>{if(ev.data==='hs-exit-present')close()};
+  const onFs=()=>{if(!document.fullscreenElement)close()};
+  addEventListener('message',onMsg);
+  if(ov.requestFullscreen)
+    ov.requestFullscreen().then(()=>document.addEventListener('fullscreenchange',onFs)).catch(()=>{});
+};
+
 /* ======================= preview width presets ======================= */
 function applyPreviewWidth(){
   const fr=$('#frameWrap iframe');if(!fr)return;
@@ -796,4 +907,4 @@ $('#codeResizer').onmousedown=e=>{
 };
 
 
-export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft };
+export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft, insertHtmlAfterSelection };

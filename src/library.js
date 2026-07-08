@@ -5,6 +5,7 @@ import { renderDiskGrid, renderDiskSection } from './disk.js';
 import { hideModal, showModal } from './ui.js';
 import { openFile } from './editor.js';
 import { WELCOME } from './welcome.js';
+import { TEMPLATES } from './templates.js';
 
 /* ======================= library rendering ======================= */
 function visibleFiles(){
@@ -215,8 +216,27 @@ const BLANK=`<!DOCTYPE html>
 <p>Start writing…</p>
 </body>
 </html>`;
-$('#btnNew').onclick=async()=>{const name=prompt('Name for the new file:','Untitled.html');
-  if(name===null)return;const f=await addFile(name||'Untitled.html',BLANK);renderLibrary();openFile(f.id)};
+/* ＋ New: template gallery — pick a real starting point, not just a blank page */
+$('#btnNew').onclick=()=>{
+  showModal(`<h3>New file</h3>
+    <div class="mrow"><label>Name</label><input type="text" id="tplName" value="Untitled.html"></div>
+    <div class="tplgrid">${TEMPLATES.map(t=>`
+      <button class="tpl" data-tpl="${t.id}">
+        <span class="tplic">${t.emoji}</span><b>${esc(t.name)}</b>
+        <span class="tpld">${esc(t.desc)}</span>
+      </button>`).join('')}</div>
+    <div class="mbtns"><button id="mCancel">Cancel</button></div>`);
+  $('#tplName').focus();$('#tplName').select();
+  $('#mCancel').onclick=hideModal;
+  $('#modal').querySelectorAll('.tpl').forEach(b=>b.onclick=async()=>{
+    const t=TEMPLATES.find(x=>x.id===b.dataset.tpl);
+    const name=$('#tplName').value.trim()||'Untitled.html';
+    hideModal();
+    const f=await addFile(name,t.html);
+    state.filter.disk=false;
+    renderLibrary();openFile(f.id);
+  });
+};
 /* drop a fresh copy of the interactive Welcome playground onto the shelf */
 async function addWelcomeFile(){
   const f=await addFile('Welcome to Hypershelf.html',WELCOME,{tags:['guide']});
