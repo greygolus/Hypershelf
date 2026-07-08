@@ -25,7 +25,10 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - `src/editor.js` — editor core: open/save, renderFrame, edit handlers/drag, serialization, applyStyle + scoped rules, inspector, code panel, drafts, width presets, resizer
 - `src/history.js` — undo/redo stack + version snapshots/modal
 - `src/diff.js`, `src/ai.js`, `src/colors.js`, `src/tour.js` — line diff, AI round-trip, 🎨 Colors panel, tour
+- `src/welcome.js` — the `WELCOME` playground HTML constant (own module so both `main.js` seed and `library.js` "＋ Example file" button import it without a circular dep)
 - `src/main.js` — init, Welcome seed, analytics injection, and **`window.hs`** — the deliberate debug/test handle (the bundle keeps everything else off the global scope; automated tests drive the app through `hs.*`)
+
+**Regenerate the Welcome file:** `library.js#addWelcomeFile()` adds a fresh copy of `WELCOME` to the shelf and opens it — wired to `#btnWelcome` (sidebar footer "📚 Add example file") and `#btnWelcome2` (empty-shelf state). Mirrors disk mode's `createExampleSite`.
 
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.

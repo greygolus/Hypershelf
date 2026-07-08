@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { renderDiskGrid, renderDiskSection } from './disk.js';
 import { hideModal, showModal } from './ui.js';
 import { openFile } from './editor.js';
+import { WELCOME } from './welcome.js';
 
 /* ======================= library rendering ======================= */
 function visibleFiles(){
@@ -50,7 +51,11 @@ function renderGrid(){
     (state.filter.tag?` · tag: ${state.filter.tag}`:'');
   if(!files.length){
     grid.innerHTML=`<div class="empty"><div class="big">📄</div>
-      ${state.files.length?'Nothing matches this filter.':'Your shelf is empty.<br>Click <b>＋ New</b>, <b>Upload</b>, or just drag &amp; drop .html files here.'}</div>`;
+      ${state.files.length?'Nothing matches this filter.':
+        `Your shelf is empty.<br>Click <b>＋ New</b>, <b>Upload</b>, or just drag &amp; drop .html files here.<br>
+         <button class="primary" id="btnWelcome2" style="margin-top:16px">📚 Add the Welcome playground</button><br>
+         <span style="font-size:12px">A guided page that walks you through every editor feature.</span>`}</div>`;
+    if($('#btnWelcome2'))$('#btnWelcome2').onclick=addWelcomeFile;
     return;}
   grid.innerHTML=files.map(f=>`
     <div class="card" data-id="${f.id}">
@@ -212,6 +217,14 @@ const BLANK=`<!DOCTYPE html>
 </html>`;
 $('#btnNew').onclick=async()=>{const name=prompt('Name for the new file:','Untitled.html');
   if(name===null)return;const f=await addFile(name||'Untitled.html',BLANK);renderLibrary();openFile(f.id)};
+/* drop a fresh copy of the interactive Welcome playground onto the shelf */
+async function addWelcomeFile(){
+  const f=await addFile('Welcome to Hypershelf.html',WELCOME,{tags:['guide']});
+  state.filter.disk=false;state.filter.folder=null;state.filter.tag=null;
+  renderLibrary();openFile(f.id);
+  toast('Added the Welcome playground');
+}
+$('#btnWelcome').onclick=addWelcomeFile;
 $('#btnUpload').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=e=>{importFileList(e.target.files);e.target.value=''};
 async function importFileList(list){
