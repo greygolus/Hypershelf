@@ -79,16 +79,7 @@ function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;
   const h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;
   return[h*60,s,l];
 }
-/* suggestion tiles: hue wheel + light/dark ramp of the current color + neutrals */
-function paletteFor(hex){
-  const c=parseColor(hex),[h,s]=rgbToHsl(c.r,c.g,c.b);
-  const tiles=[];
-  for(let i=0;i<12;i++){const[r,g,b]=hslToRgb(i*30,Math.max(s,.55),.55);tiles.push(toHex(r,g,b))}
-  const ss=s>.05?s:.6;
-  [.92,.78,.64,.5,.36,.22].forEach(l=>{const[r,g,b]=hslToRgb(h,ss,l);tiles.push(toHex(r,g,b))});
-  tiles.push('#000000','#444444','#888888','#bbbbbb','#e8e8e8','#ffffff');
-  return[...new Set(tiles)];
-}
+const hslHex=(h,s,l)=>{const[r,g,b]=hslToRgb(h,s,l);return toHex(r,g,b)};
 function swappedHtml(grp,newHex){
   const c=parseColor(newHex);if(!c)return themeBase;
   return mapCssRegions(themeBase,css=>{
@@ -132,18 +123,23 @@ function renderThemePanel(){
       <button id="thBack" ${themeHist.length?'':'disabled'} title="Undo the last color/font change">↶ Back</button>
       <button id="thReset" ${state.cur.html!==themeOrig?'':'disabled'} title="Undo everything changed since this panel was opened">Reset all</button></div>
     <div class="hint" style="font-size:11.5px">A swatch swaps that color <b>everywhere</b> in this file's CSS (transparent variants follow along).
-      Click a row for suggestions — <b>hover a tile to preview it live</b>, click to apply.</div>
+      Click a row to open the picker — <b>the sliders preview live</b>, release to apply.</div>
     <div class="field"><label>Colors (${t.colors.length})</label>
       <div class="tswl">${t.colors.map((c,i)=>`
         <div class="tsw">
-          <div class="tswh" data-ci="${i}" title="Click for suggestions">
+          <div class="tswh" data-ci="${i}" title="Click to open the color picker">
             <input type="color" data-ci="${i}" value="${c.hex}">
             <div class="tswi"><span class="thex">${c.hex}</span>
               <span class="tuse">${c.count} use${c.count>1?'s':''}${c.tokens.size>1?' · '+c.tokens.size+' forms':''}</span></div>
             <button class="texp ghost">${themeExpanded===i?'▴':'▾'}</button>
           </div>
-          ${themeExpanded===i?`<div class="tpal" data-ci="${i}">${paletteFor(c.hex).map(px=>
-            `<span data-c="${px}" style="background:${px}" title="${px}"></span>`).join('')}</div>`:''}
+          ${themeExpanded===i?`<div class="tpicker" data-ci="${i}">
+            <input type="range" class="tph" min="0" max="360" step="1" title="Hue">
+            <input type="range" class="tps" min="0" max="100" step="1" title="Saturation">
+            <input type="range" class="tpl" min="0" max="100" step="1" title="Lightness">
+            <div class="tphexrow"><span class="tpprev"></span>
+              <input type="text" class="tphex" maxlength="7" spellcheck="false" title="Hex — press Enter to apply"></div>
+          </div>`:''}
         </div>`).join('')||'<span class="tuse">No colors found in this file\'s CSS.</span>'}
       </div></div>
     <div class="field"><label>Font stacks (${t.fonts.length})</label>
@@ -182,14 +178,32 @@ function renderThemePanel(){
     inp.oninput=()=>liveSwap(grp,inp.value);
     inp.onchange=()=>applyColorSwap(grp,inp.value,true);
   });
-  panel.querySelectorAll('.tpal').forEach(pal=>{
-    const grp=t.colors[+pal.dataset.ci];
-    pal.querySelectorAll('span').forEach(tile=>{
-      tile.onmouseenter=()=>{clearTimeout(themeHoverT);
-        themeHoverT=setTimeout(()=>previewColorSwap(grp,tile.dataset.c),120)};
-      tile.onclick=()=>applyColorSwap(grp,tile.dataset.c,true);
+  /* HSL slider picker: sliders live-preview the whole file, releasing commits */
+  panel.querySelectorAll('.tpicker').forEach(pk=>{
+    const grp=t.colors[+pk.dataset.ci];
+    const c0=parseColor(grp.hex),[h0,s0,l0]=rgbToHsl(c0.r,c0.g,c0.b);
+    const hI=pk.querySelector('.tph'),sI=pk.querySelector('.tps'),lI=pk.querySelector('.tpl');
+    const hexI=pk.querySelector('.tphex'),prev=pk.querySelector('.tpprev');
+    hI.value=Math.round(h0);sI.value=Math.round(s0*100);lI.value=Math.round(l0*100);
+    const cur=()=>hslHex(+hI.value,+sI.value/100,+lI.value/100);
+    const paint=()=>{ /* slider tracks show what moving each one would do */
+      const h=+hI.value,s=+sI.value/100,l=+lI.value/100,hx=cur();
+      hexI.value=hx;prev.style.background=hx;
+      hI.style.background='linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)';
+      sI.style.background=`linear-gradient(90deg,${hslHex(h,0,l)},${hslHex(h,1,l)})`;
+      lI.style.background=`linear-gradient(90deg,#000,${hslHex(h,s,.5)},#fff)`;
+    };
+    paint();
+    [hI,sI,lI].forEach(sl=>{
+      sl.oninput=()=>{paint();clearTimeout(themeHoverT);
+        const hx=cur();themeHoverT=setTimeout(()=>previewColorSwap(grp,hx),80)};
+      sl.onchange=()=>applyColorSwap(grp,cur(),true);
     });
-    pal.onmouseleave=revertThemePreview;
+    hexI.onchange=()=>{
+      let v=hexI.value.trim();if(v&&!v.startsWith('#'))v='#'+v;
+      if(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v))applyColorSwap(grp,v,true);
+      else{toast('Enter a hex color like #54C8FF');hexI.value=cur()}
+    };
   });
   panel.querySelectorAll('input[data-fi]').forEach(inp=>{
     inp.onchange=()=>{
@@ -223,4 +237,4 @@ $('#btnColors').onclick=()=>{
 };
 
 
-export { mapCssRegions, hslToRgb, parseColor, toHex, normFam, scanTheme, replaceToken, themeBase, themeScan, themeOrig, themeHist, themeExpanded, themeHoverT, rgbToHsl, paletteFor, swappedHtml, previewColorSwap, revertThemePreview, applyColorSwap, renderThemePanel, closeThemePanel };
+export { mapCssRegions, hslToRgb, parseColor, toHex, normFam, scanTheme, replaceToken, themeBase, themeScan, themeOrig, themeHist, themeExpanded, themeHoverT, rgbToHsl, hslHex, swappedHtml, previewColorSwap, revertThemePreview, applyColorSwap, renderThemePanel, closeThemePanel };

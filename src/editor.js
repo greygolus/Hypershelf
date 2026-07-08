@@ -125,8 +125,7 @@ function renderFrame(){
     const st=disp.createElement('style');
     st.textContent='[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}'+
       '[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}'+
-      '[data-hs-drop-before]{box-shadow:0 -3px 0 0 #4cd97b!important}'+
-      '[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}'+
+      '[data-hs-dragging]{opacity:.55!important;outline:2px dashed #4cd97b!important;outline-offset:-1px}'+
       '#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}'+
       '#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}'+
       '#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}'+
@@ -188,12 +187,11 @@ function attachEditHandlers(doc){
       by:cs.boxSizing==='border-box'?0:sum('paddingTop','paddingBottom','borderTopWidth','borderBottomWidth')};
     doc.getElementById('hsSize').style.display='block';
   },true);
-  const clearMarks=()=>doc.querySelectorAll('[data-hs-drop-before],[data-hs-drop-after]')
-    .forEach(el=>{el.removeAttribute('data-hs-drop-before');el.removeAttribute('data-hs-drop-after')});
   doc.body.addEventListener('mousedown',e=>{
     const t=e.target.closest('['+HS+']');
     if(!t||t!==state.selEl)return; /* only the selected element is draggable */
-    drag={el:t,x:e.clientX,y:e.clientY,active:false,target:null,before:false};
+    drag={el:t,x:e.clientX,y:e.clientY,active:false,moved:false,prevPE:'',
+      origParent:t.parentElement,origNext:t.nextElementSibling};
   },true);
   doc.addEventListener('mousemove',e=>{
     if(!rz)return;
@@ -222,31 +220,65 @@ function attachEditHandlers(doc){
       if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)<6)return;
       drag.active=true;doc.body.style.cursor='grabbing';
       hbox.style.display='none'; /* handles out of the way while moving */
+      drag.prevPE=drag.el.style.pointerEvents;
+      drag.el.style.pointerEvents='none'; /* hit-test through the element being moved */
+      drag.el.setAttribute('data-hs-dragging','');
     }
-    clearMarks();drag.target=null;
+    /* LIVE reorder: the element actually moves as you drag, so what you
+       see during the drag is exactly what you get on release */
     const t=doc.elementFromPoint(e.clientX,e.clientY);
     const tgt=t&&t.closest('['+HS+']');
     if(!tgt||tgt===drag.el||drag.el.contains(tgt))return;
     const r=tgt.getBoundingClientRect();
-    drag.before=e.clientY<r.top+r.height/2;
-    tgt.setAttribute(drag.before?'data-hs-drop-before':'data-hs-drop-after','');
-    drag.target=tgt;
+    if(e.clientY<r.top+r.height/2){
+      if(tgt.previousElementSibling!==drag.el){tgt.before(drag.el);drag.moved=true}
+    }else{
+      if(tgt.nextElementSibling!==drag.el){tgt.after(drag.el);drag.moved=true}
+    }
   },true);
+  const endDrag=(cancel)=>{
+    const d=drag;drag=null;
+    doc.body.style.cursor='';
+    d.el.style.pointerEvents=d.prevPE;
+    if(!d.el.getAttribute('style'))d.el.removeAttribute('style');
+    d.el.removeAttribute('data-hs-dragging');
+    if(cancel&&d.moved){ /* pointer left the page — put the element back */
+      if(d.origNext)d.origNext.before(d.el);else d.origParent.append(d.el);
+      positionHandles();return;
+    }
+    if(d.moved){
+      /* mirror the final display position into the source document */
+      const s=srcEl();
+      if(s){
+        let ref=d.el.previousElementSibling;
+        while(ref&&ref.getAttribute(HS)===null)ref=ref.previousElementSibling;
+        if(ref)state.srcDoc.querySelector(`[${HS}="${ref.getAttribute(HS)}"]`).after(s);
+        else{
+          ref=d.el.nextElementSibling;
+          while(ref&&ref.getAttribute(HS)===null)ref=ref.nextElementSibling;
+          if(ref)state.srcDoc.querySelector(`[${HS}="${ref.getAttribute(HS)}"]`).before(s);
+          else{
+            const p=d.el.parentElement;
+            const sp=p&&p.getAttribute(HS)!==null
+              ?state.srcDoc.querySelector(`[${HS}="${p.getAttribute(HS)}"]`)
+              :state.srcDoc.body;
+            if(sp)sp.prepend(s);
+          }
+        }
+      }
+      scheduleSerialize();
+      if(state.codeOpen)jumpToEl(d.el);
+    }
+    positionHandles();
+  };
   doc.body.addEventListener('mouseup',()=>{
     if(!drag)return;
-    const d=drag;drag=null;doc.body.style.cursor='';clearMarks();
-    if(!d.active)return;
+    const wasActive=drag.active;
+    if(!wasActive){drag=null;return}
     justDragged=true; /* swallow the click this drag generates */
-    if(!d.target)return;
-    const s=srcEl();
-    const st2=state.srcDoc.querySelector(`[${HS}="${d.target.getAttribute(HS)}"]`);
-    if(!s||!st2)return;
-    if(d.before){d.target.before(d.el);st2.before(s)}
-    else{d.target.after(d.el);st2.after(s)}
-    scheduleSerialize();positionHandles();
-    if(state.codeOpen)jumpToEl(d.el);
+    endDrag(false);
   },true);
-  doc.addEventListener('mouseleave',()=>{if(drag){drag=null;doc.body.style.cursor='';clearMarks()}});
+  doc.addEventListener('mouseleave',()=>{if(drag&&drag.active)endDrag(true);else drag=null});
   doc.body.addEventListener('click',e=>{
     e.preventDefault();e.stopPropagation();
     if(justDragged){justDragged=false;return}

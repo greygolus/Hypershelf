@@ -1,7 +1,7 @@
 {
   "name": "hypershelf",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Google Drive + Docs for self-contained HTML files. Source in src/, built to a single Hypershelf.html.",
   "scripts": {
     "dev": "npx -y http-server -p 8787 -c-1 .",

@@ -257,9 +257,14 @@
     border:1px solid var(--border);border-radius:8px}
   .tswh{display:flex;align-items:center;gap:9px;cursor:pointer}
   .tswh .texp{margin-left:auto;padding:0 6px;font-size:11px;flex-shrink:0}
-  .tpal{display:flex;flex-wrap:wrap;gap:4px;padding:7px 1px 2px}
-  .tpal span{width:18px;height:18px;border-radius:4px;cursor:pointer;border:1px solid rgba(0,0,0,.3)}
-  .tpal span:hover{outline:2px solid var(--accent);outline-offset:1px}
+  .tpicker{display:flex;flex-direction:column;gap:9px;padding:10px 2px 4px}
+  .tpicker input[type=range]{-webkit-appearance:none;appearance:none;height:14px;border-radius:7px;
+    border:1px solid rgba(0,0,0,.35);outline:none;padding:0;width:100%;cursor:pointer}
+  .tpicker input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;
+    border-radius:50%;background:#fff;border:2px solid #333;box-shadow:0 1px 4px rgba(0,0,0,.5);cursor:pointer}
+  .tphexrow{display:flex;gap:8px;align-items:center}
+  .tpprev{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);flex-shrink:0}
+  .tphex{flex:1;min-width:0;font-family:var(--mono);font-size:12px}
   .throw{display:flex;gap:6px}
   .throw button{flex:1;font-size:12px;padding:5px 4px}
   .tsw input[type=color]{width:34px;height:28px;padding:2px;border:1px solid var(--border);
@@ -722,21 +727,10 @@
     const h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
     return [h * 60, s, l];
   }
-  function paletteFor(hex) {
-    const c = parseColor(hex), [h, s] = rgbToHsl(c.r, c.g, c.b);
-    const tiles = [];
-    for (let i = 0; i < 12; i++) {
-      const [r, g, b] = hslToRgb(i * 30, Math.max(s, 0.55), 0.55);
-      tiles.push(toHex(r, g, b));
-    }
-    const ss = s > 0.05 ? s : 0.6;
-    [0.92, 0.78, 0.64, 0.5, 0.36, 0.22].forEach((l) => {
-      const [r, g, b] = hslToRgb(h, ss, l);
-      tiles.push(toHex(r, g, b));
-    });
-    tiles.push("#000000", "#444444", "#888888", "#bbbbbb", "#e8e8e8", "#ffffff");
-    return [...new Set(tiles)];
-  }
+  var hslHex = (h, s, l) => {
+    const [r, g, b] = hslToRgb(h, s, l);
+    return toHex(r, g, b);
+  };
   function swappedHtml(grp, newHex) {
     const c = parseColor(newHex);
     if (!c) return themeBase;
@@ -790,17 +784,23 @@
       <button id="thBack" ${themeHist.length ? "" : "disabled"} title="Undo the last color/font change">↶ Back</button>
       <button id="thReset" ${state.cur.html !== themeOrig ? "" : "disabled"} title="Undo everything changed since this panel was opened">Reset all</button></div>
     <div class="hint" style="font-size:11.5px">A swatch swaps that color <b>everywhere</b> in this file's CSS (transparent variants follow along).
-      Click a row for suggestions — <b>hover a tile to preview it live</b>, click to apply.</div>
+      Click a row to open the picker — <b>the sliders preview live</b>, release to apply.</div>
     <div class="field"><label>Colors (${t.colors.length})</label>
       <div class="tswl">${t.colors.map((c, i) => `
         <div class="tsw">
-          <div class="tswh" data-ci="${i}" title="Click for suggestions">
+          <div class="tswh" data-ci="${i}" title="Click to open the color picker">
             <input type="color" data-ci="${i}" value="${c.hex}">
             <div class="tswi"><span class="thex">${c.hex}</span>
               <span class="tuse">${c.count} use${c.count > 1 ? "s" : ""}${c.tokens.size > 1 ? " · " + c.tokens.size + " forms" : ""}</span></div>
             <button class="texp ghost">${themeExpanded === i ? "▴" : "▾"}</button>
           </div>
-          ${themeExpanded === i ? `<div class="tpal" data-ci="${i}">${paletteFor(c.hex).map((px) => `<span data-c="${px}" style="background:${px}" title="${px}"></span>`).join("")}</div>` : ""}
+          ${themeExpanded === i ? `<div class="tpicker" data-ci="${i}">
+            <input type="range" class="tph" min="0" max="360" step="1" title="Hue">
+            <input type="range" class="tps" min="0" max="100" step="1" title="Saturation">
+            <input type="range" class="tpl" min="0" max="100" step="1" title="Lightness">
+            <div class="tphexrow"><span class="tpprev"></span>
+              <input type="text" class="tphex" maxlength="7" spellcheck="false" title="Hex — press Enter to apply"></div>
+          </div>` : ""}
         </div>`).join("") || `<span class="tuse">No colors found in this file's CSS.</span>`}
       </div></div>
     <div class="field"><label>Font stacks (${t.fonts.length})</label>
@@ -853,16 +853,42 @@
       inp.oninput = () => liveSwap(grp, inp.value);
       inp.onchange = () => applyColorSwap(grp, inp.value, true);
     });
-    panel.querySelectorAll(".tpal").forEach((pal) => {
-      const grp = t.colors[+pal.dataset.ci];
-      pal.querySelectorAll("span").forEach((tile) => {
-        tile.onmouseenter = () => {
+    panel.querySelectorAll(".tpicker").forEach((pk) => {
+      const grp = t.colors[+pk.dataset.ci];
+      const c0 = parseColor(grp.hex), [h0, s0, l0] = rgbToHsl(c0.r, c0.g, c0.b);
+      const hI = pk.querySelector(".tph"), sI = pk.querySelector(".tps"), lI = pk.querySelector(".tpl");
+      const hexI = pk.querySelector(".tphex"), prev = pk.querySelector(".tpprev");
+      hI.value = Math.round(h0);
+      sI.value = Math.round(s0 * 100);
+      lI.value = Math.round(l0 * 100);
+      const cur = () => hslHex(+hI.value, +sI.value / 100, +lI.value / 100);
+      const paint = () => {
+        const h = +hI.value, s = +sI.value / 100, l = +lI.value / 100, hx = cur();
+        hexI.value = hx;
+        prev.style.background = hx;
+        hI.style.background = "linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)";
+        sI.style.background = `linear-gradient(90deg,${hslHex(h, 0, l)},${hslHex(h, 1, l)})`;
+        lI.style.background = `linear-gradient(90deg,#000,${hslHex(h, s, 0.5)},#fff)`;
+      };
+      paint();
+      [hI, sI, lI].forEach((sl) => {
+        sl.oninput = () => {
+          paint();
           clearTimeout(themeHoverT);
-          themeHoverT = setTimeout(() => previewColorSwap(grp, tile.dataset.c), 120);
+          const hx = cur();
+          themeHoverT = setTimeout(() => previewColorSwap(grp, hx), 80);
         };
-        tile.onclick = () => applyColorSwap(grp, tile.dataset.c, true);
+        sl.onchange = () => applyColorSwap(grp, cur(), true);
       });
-      pal.onmouseleave = revertThemePreview;
+      hexI.onchange = () => {
+        let v = hexI.value.trim();
+        if (v && !v.startsWith("#")) v = "#" + v;
+        if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) applyColorSwap(grp, v, true);
+        else {
+          toast("Enter a hex color like #54C8FF");
+          hexI.value = cur();
+        }
+      };
     });
     panel.querySelectorAll("input[data-fi]").forEach((inp) => {
       inp.onchange = () => {
@@ -1172,7 +1198,7 @@
         });
       });
       const st = disp.createElement("style");
-      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-drop-before]{box-shadow:0 -3px 0 0 #4cd97b!important}[data-hs-drop-after]{box-shadow:0 3px 0 0 #4cd97b!important}#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}";
+      st.textContent = "[data-hs-hover]{outline:2px dashed #54C8FF!important;outline-offset:-1px;cursor:pointer!important}[data-hs-sel]{outline:2px solid #54C8FF!important;outline-offset:-1px}[data-hs-dragging]{opacity:.55!important;outline:2px dashed #4cd97b!important;outline-offset:-1px}#hsHandles{position:fixed;display:none;pointer-events:none;z-index:2147483000}#hsHandles .hsz{position:absolute;width:10px;height:10px;background:#54C8FF;border:1.5px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 1px 4px rgba(0,0,0,.4)}#hsHandles .hsz[data-h=e]{right:-5px;top:calc(50% - 5px);cursor:ew-resize}#hsHandles .hsz[data-h=s]{bottom:-5px;left:calc(50% - 5px);cursor:ns-resize}#hsHandles .hsz[data-h=se]{right:-5px;bottom:-5px;cursor:nwse-resize}#hsSize{position:absolute;right:0;top:calc(100% + 8px);background:#0b0b0d;color:#ECEEED;font:11px monospace;padding:2px 7px;border-radius:6px;border:1px solid #26262b;display:none;white-space:nowrap}";
       disp.head.appendChild(st);
       fr.onload = () => attachEditHandlers(fr.contentDocument);
       wrap.appendChild(fr);
@@ -1241,14 +1267,19 @@
       };
       doc.getElementById("hsSize").style.display = "block";
     }, true);
-    const clearMarks = () => doc.querySelectorAll("[data-hs-drop-before],[data-hs-drop-after]").forEach((el) => {
-      el.removeAttribute("data-hs-drop-before");
-      el.removeAttribute("data-hs-drop-after");
-    });
     doc.body.addEventListener("mousedown", (e) => {
       const t = e.target.closest("[" + HS + "]");
       if (!t || t !== state.selEl) return;
-      drag = { el: t, x: e.clientX, y: e.clientY, active: false, target: null, before: false };
+      drag = {
+        el: t,
+        x: e.clientX,
+        y: e.clientY,
+        active: false,
+        moved: false,
+        prevPE: "",
+        origParent: t.parentElement,
+        origNext: t.nextElementSibling
+      };
     }, true);
     doc.addEventListener("mousemove", (e) => {
       if (!rz) return;
@@ -1278,46 +1309,74 @@
         drag.active = true;
         doc.body.style.cursor = "grabbing";
         hbox.style.display = "none";
+        drag.prevPE = drag.el.style.pointerEvents;
+        drag.el.style.pointerEvents = "none";
+        drag.el.setAttribute("data-hs-dragging", "");
       }
-      clearMarks();
-      drag.target = null;
       const t = doc.elementFromPoint(e.clientX, e.clientY);
       const tgt = t && t.closest("[" + HS + "]");
       if (!tgt || tgt === drag.el || drag.el.contains(tgt)) return;
       const r = tgt.getBoundingClientRect();
-      drag.before = e.clientY < r.top + r.height / 2;
-      tgt.setAttribute(drag.before ? "data-hs-drop-before" : "data-hs-drop-after", "");
-      drag.target = tgt;
+      if (e.clientY < r.top + r.height / 2) {
+        if (tgt.previousElementSibling !== drag.el) {
+          tgt.before(drag.el);
+          drag.moved = true;
+        }
+      } else {
+        if (tgt.nextElementSibling !== drag.el) {
+          tgt.after(drag.el);
+          drag.moved = true;
+        }
+      }
     }, true);
-    doc.body.addEventListener("mouseup", () => {
-      if (!drag) return;
+    const endDrag = (cancel) => {
       const d = drag;
       drag = null;
       doc.body.style.cursor = "";
-      clearMarks();
-      if (!d.active) return;
-      justDragged = true;
-      if (!d.target) return;
-      const s = srcEl();
-      const st2 = state.srcDoc.querySelector(`[${HS}="${d.target.getAttribute(HS)}"]`);
-      if (!s || !st2) return;
-      if (d.before) {
-        d.target.before(d.el);
-        st2.before(s);
-      } else {
-        d.target.after(d.el);
-        st2.after(s);
+      d.el.style.pointerEvents = d.prevPE;
+      if (!d.el.getAttribute("style")) d.el.removeAttribute("style");
+      d.el.removeAttribute("data-hs-dragging");
+      if (cancel && d.moved) {
+        if (d.origNext) d.origNext.before(d.el);
+        else d.origParent.append(d.el);
+        positionHandles();
+        return;
       }
-      scheduleSerialize();
+      if (d.moved) {
+        const s = srcEl();
+        if (s) {
+          let ref = d.el.previousElementSibling;
+          while (ref && ref.getAttribute(HS) === null) ref = ref.previousElementSibling;
+          if (ref) state.srcDoc.querySelector(`[${HS}="${ref.getAttribute(HS)}"]`).after(s);
+          else {
+            ref = d.el.nextElementSibling;
+            while (ref && ref.getAttribute(HS) === null) ref = ref.nextElementSibling;
+            if (ref) state.srcDoc.querySelector(`[${HS}="${ref.getAttribute(HS)}"]`).before(s);
+            else {
+              const p = d.el.parentElement;
+              const sp = p && p.getAttribute(HS) !== null ? state.srcDoc.querySelector(`[${HS}="${p.getAttribute(HS)}"]`) : state.srcDoc.body;
+              if (sp) sp.prepend(s);
+            }
+          }
+        }
+        scheduleSerialize();
+        if (state.codeOpen) jumpToEl(d.el);
+      }
       positionHandles();
-      if (state.codeOpen) jumpToEl(d.el);
+    };
+    doc.body.addEventListener("mouseup", () => {
+      if (!drag) return;
+      const wasActive = drag.active;
+      if (!wasActive) {
+        drag = null;
+        return;
+      }
+      justDragged = true;
+      endDrag(false);
     }, true);
     doc.addEventListener("mouseleave", () => {
-      if (drag) {
-        drag = null;
-        doc.body.style.cursor = "";
-        clearMarks();
-      }
+      if (drag && drag.active) endDrag(true);
+      else drag = null;
     });
     doc.body.addEventListener("click", (e) => {
       e.preventDefault();
@@ -2562,7 +2621,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
   <h2 class="sec">Move · resize · multiply</h2>
   <div class="tip"><b>Drag to move</b> — a selected element can be dragged anywhere on the page.
     <div class="badges"><span class="badge">Alpha</span><span class="badge">Beta</span><span class="badge">Gamma</span></div>
-    <span class="try">select a badge above, then drag it between the others (green line shows where it lands).</span></div>
+    <span class="try">select a badge above, then drag it between the others — it reorders live as you move.</span></div>
   <div class="tip"><b>Resize</b> — a selected element grows cyan ◢ handles on its edges.
     <div class="box">resize me</div>
     <span class="try">select the box and drag its corner handle; watch the size readout.</span></div>
@@ -2573,7 +2632,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
   <div class="tip"><b>Inspector sections</b> — Spacing, Layout &amp; size (display + flex controls), Border &amp; effects (shadows, corner radius, opacity), Attributes.
     <span class="try">give the resize box a <b>glow</b> shadow from Border &amp; effects.</span></div>
   <div class="tip"><b>🎨 Colors</b> (top bar) lists every color and font in this file with usage counts.
-    <span class="try">open it, click a swatch row, and hover the suggestion tiles — the whole page recolors live before you commit.</span></div>
+    <span class="try">open it, click a swatch row, and drag the sliders — the whole page recolors live; release to apply.</span></div>
   <div class="tip"><b>Built-in fonts</b> — the 🅰 button offers 14 font stacks that render on any machine, no font files needed.
     <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from 🎨 Colors.</span></div>
 

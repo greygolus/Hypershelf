@@ -39,7 +39,7 @@ export const WELCOME=`<!DOCTYPE html>
   <h2 class="sec">Move · resize · multiply</h2>
   <div class="tip"><b>Drag to move</b> — a selected element can be dragged anywhere on the page.
     <div class="badges"><span class="badge">Alpha</span><span class="badge">Beta</span><span class="badge">Gamma</span></div>
-    <span class="try">select a badge above, then drag it between the others (green line shows where it lands).</span></div>
+    <span class="try">select a badge above, then drag it between the others — it reorders live as you move.</span></div>
   <div class="tip"><b>Resize</b> — a selected element grows cyan ◢ handles on its edges.
     <div class="box">resize me</div>
     <span class="try">select the box and drag its corner handle; watch the size readout.</span></div>
@@ -50,7 +50,7 @@ export const WELCOME=`<!DOCTYPE html>
   <div class="tip"><b>Inspector sections</b> — Spacing, Layout &amp; size (display + flex controls), Border &amp; effects (shadows, corner radius, opacity), Attributes.
     <span class="try">give the resize box a <b>glow</b> shadow from Border &amp; effects.</span></div>
   <div class="tip"><b>🎨 Colors</b> (top bar) lists every color and font in this file with usage counts.
-    <span class="try">open it, click a swatch row, and hover the suggestion tiles — the whole page recolors live before you commit.</span></div>
+    <span class="try">open it, click a swatch row, and drag the sliders — the whole page recolors live; release to apply.</span></div>
   <div class="tip"><b>Built-in fonts</b> — the 🅰 button offers 14 font stacks that render on any machine, no font files needed.
     <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from 🎨 Colors.</span></div>
 
