@@ -56,6 +56,7 @@ html:`<!DOCTYPE html>
 </html>`},
 
 {id:'deck',emoji:'🖥️',name:'Slide deck',desc:'Full-screen slides — present with the ▶ button.',
+tags:['slideshow'], /* shelf tag switches the filmstrip on; the body attribute below travels with the file */
 html:`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -76,7 +77,7 @@ html:`<!DOCTYPE html>
   .tagline{color:#54C8FF;font-size:3vh}
 </style>
 </head>
-<body>
+<body data-hs-slideshow>
 <section class="slide title">
   <h1>Presentation title</h1>
   <p class="tagline">A subtitle goes here — double-click any text to edit it.</p>

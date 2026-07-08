@@ -36,6 +36,12 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
+**Added in v1.13.1 (July 8 2026) — slideshows are explicit (supersedes v1.12's detection):**
+- The 2+-`<section>` heuristic was a false-positive machine (plain documents use `<section>`). `isDeck(html)` is replaced by **`isSlideshow(cur)`** (slides.js): true only when the shelf file has a **"slideshow" tag** (`/^slide ?show$/i` — the normal tags UI adds/removes it) OR the file's HTML contains **`data-hs-slideshow`** (an attribute on `<body>` — travels with the file through share links, downloads, and disk mode, which has no tags).
+- The **deck template opts in both ways**: `tags:['slideshow']` on the template entry (library.js passes template tags to `addFile`) + `<body data-hs-slideshow>` in its HTML.
+- **Share links now carry tags** (`{n,h,t}` payload — old `{n,h}` links still parse; `t` capped at 20 strings on receive), so a shared slideshow stays a slideshow on the recipient's shelf.
+- To make any existing file a slideshow: tag it `slideshow` (card ⋮ → Edit tags), or add `data-hs-slideshow` to its `<body>` (only option for disk files).
+
 **Added in v1.13 (July 8 2026) — gradient editor in the inspector:**
 - **Why**: gradients are everywhere in AI-generated files; the inspector's Background control wrote `background-color`, which is invisible under a gradient's `background-image` (or wiped it via shorthand) — "doesn't work or replaces it with a solid".
 - **Detection**: `renderInspector` runs `parseGradient(cs.backgroundImage)` (computed style — shorthand already resolved, colors normalized to rgb()). If it parses, the Background field is replaced by a **gradient editor**: live preview bar, one row per stop (color input + position text + ⍺ badge when the stop has alpha), type select (linear/radial), angle input (linear only), ＋ stop / → solid / reset.

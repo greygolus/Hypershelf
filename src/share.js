@@ -37,12 +37,14 @@ const SHARE_BASE=/^https?:$/.test(location.protocol)
   :'https://hypershelf.vercel.app/';
 const WARN_LEN=8000; /* chat apps and mail clients get flaky with links past a few KB */
 
-async function makeShareLink(name,html){
-  return SHARE_BASE+'#s='+b64urlEncode(await deflate(JSON.stringify({n:name,h:html})));
+async function makeShareLink(name,html,tags){
+  const payload={n:name,h:html};
+  if(tags&&tags.length)payload.t=tags; /* tags travel too — a shared slideshow stays a slideshow */
+  return SHARE_BASE+'#s='+b64urlEncode(await deflate(JSON.stringify(payload)));
 }
-async function shareFile(name,html){
+async function shareFile(name,html,tags){
   let link;
-  try{link=await makeShareLink(name,html)}
+  try{link=await makeShareLink(name,html,tags)}
   catch(err){console.warn(err);toast('Could not create the share link');return}
   const big=link.length>WARN_LEN
     ?` It's ${Math.round(link.length/1024)} KB — some chat apps truncate links that long; Download may travel safer.`:'';
@@ -65,10 +67,11 @@ async function checkShareHash(){
   const m=location.hash.match(/^#s=([A-Za-z0-9_-]+)$/);
   if(!m)return;
   const clearHash=()=>history.replaceState(null,'',location.pathname+location.search);
-  let name,html;
+  let name,html,tags;
   try{
     const data=JSON.parse(await inflate(b64urlDecode(m[1])));
     name=String(data.n||'Shared.html');html=String(data.h||'');
+    tags=Array.isArray(data.t)?data.t.filter(t=>typeof t==='string').slice(0,20):[];
     if(!html)throw 0;
   }catch{clearHash();toast('That share link is damaged or incomplete');return}
   showModal(`<h3>🔗 Shared file</h3>
@@ -79,7 +82,7 @@ async function checkShareHash(){
   $('#shNo').onclick=()=>{hideModal();clearHash()};
   $('#shYes').onclick=async()=>{
     hideModal();clearHash();
-    const f=await addFile(name,html);
+    const f=await addFile(name,html,{tags});
     state.filter.disk=false;state.filter.folder=null;state.filter.tag=null;
     renderLibrary();openFile(f.id);
     toast('Added to your shelf');
@@ -92,7 +95,7 @@ window.addEventListener('hashchange',checkShareHash);
 $('#btnShare').onclick=()=>{
   if(!state.cur)return;
   syncNow();
-  shareFile(state.cur.name,state.cur.html);
+  shareFile(state.cur.name,state.cur.html,state.cur.tags);
 };
 
 export { makeShareLink, shareFile, checkShareHash };

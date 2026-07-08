@@ -3066,13 +3066,15 @@ document.querySelectorAll('.card').forEach((card, i) => {
   }
   var SHARE_BASE = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : "https://hypershelf.vercel.app/";
   var WARN_LEN = 8e3;
-  async function makeShareLink(name, html) {
-    return SHARE_BASE + "#s=" + b64urlEncode(await deflate(JSON.stringify({ n: name, h: html })));
+  async function makeShareLink(name, html, tags) {
+    const payload = { n: name, h: html };
+    if (tags && tags.length) payload.t = tags;
+    return SHARE_BASE + "#s=" + b64urlEncode(await deflate(JSON.stringify(payload)));
   }
-  async function shareFile(name, html) {
+  async function shareFile(name, html, tags) {
     let link;
     try {
-      link = await makeShareLink(name, html);
+      link = await makeShareLink(name, html, tags);
     } catch (err) {
       console.warn(err);
       toast("Could not create the share link");
@@ -3097,11 +3099,12 @@ document.querySelectorAll('.card').forEach((card, i) => {
     const m = location.hash.match(/^#s=([A-Za-z0-9_-]+)$/);
     if (!m) return;
     const clearHash = () => history.replaceState(null, "", location.pathname + location.search);
-    let name, html;
+    let name, html, tags;
     try {
       const data = JSON.parse(await inflate(b64urlDecode(m[1])));
       name = String(data.n || "Shared.html");
       html = String(data.h || "");
+      tags = Array.isArray(data.t) ? data.t.filter((t) => typeof t === "string").slice(0, 20) : [];
       if (!html) throw 0;
     } catch {
       clearHash();
@@ -3120,7 +3123,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     $("#shYes").onclick = async () => {
       hideModal();
       clearHash();
-      const f = await addFile(name, html);
+      const f = await addFile(name, html, { tags });
       state.filter.disk = false;
       state.filter.folder = null;
       state.filter.tag = null;
@@ -3133,7 +3136,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
   $("#btnShare").onclick = () => {
     if (!state.cur) return;
     syncNow();
-    shareFile(state.cur.name, state.cur.html);
+    shareFile(state.cur.name, state.cur.html, state.cur.tags);
   };
 
   // src/welcome.js
@@ -3277,6 +3280,8 @@ document.querySelectorAll('.card').forEach((card, i) => {
       emoji: "🖥️",
       name: "Slide deck",
       desc: "Full-screen slides — present with the ▶ button.",
+      tags: ["slideshow"],
+      /* shelf tag switches the filmstrip on; the body attribute below travels with the file */
       html: `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3297,7 +3302,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
   .tagline{color:#54C8FF;font-size:3vh}
 </style>
 </head>
-<body>
+<body data-hs-slideshow>
 <section class="slide title">
   <h1>Presentation title</h1>
   <p class="tagline">A subtitle goes here — double-click any text to edit it.</p>
@@ -3655,7 +3660,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
       const t = TEMPLATES.find((x) => x.id === b.dataset.tpl);
       const name = $("#tplName").value.trim() || "Untitled.html";
       hideModal();
-      const f = await addFile(name, t.html);
+      const f = await addFile(name, t.html, t.tags ? { tags: [...t.tags] } : {});
       state.filter.disk = false;
       renderLibrary();
       openFile(f.id);
@@ -3969,8 +3974,10 @@ document.querySelectorAll('.card').forEach((card, i) => {
   $("#btnTour").onclick = startTour;
 
   // src/slides.js
-  function isDeck(html) {
-    return ((html || "").match(/<section[\s>]/gi) || []).length >= 2;
+  function isSlideshow(cur) {
+    if (!cur) return false;
+    if ((cur.tags || []).some((t) => /^slide ?show$/i.test(t))) return true;
+    return /data-hs-slideshow/.test(cur.html || "");
   }
   function getSlides(doc) {
     return [...doc.querySelectorAll("section")];
@@ -4078,7 +4085,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     const html = state.cur.html;
     const n = (html.match(/<section[\s>]/gi) || []).length;
     if (activeSlide >= n) activeSlide = Math.max(0, n - 1);
-    list.innerHTML = "";
+    list.innerHTML = n ? "" : '<div class="hint" style="padding:4px 2px">No slides yet — ＋ Add creates the first one.</div>';
     for (let i = 0; i < n; i++) {
       const t = document.createElement("div");
       t.className = "sthumb" + (i === activeSlide ? " active" : "");
@@ -4113,7 +4120,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     }
   }
   function refreshSlidesUI() {
-    const deck = !!state.cur && isDeck(state.cur.html);
+    const deck = isSlideshow(state.cur);
     $("#btnSlides").classList.toggle("off", !deck);
     const show = deck && localStorage.getItem("hs-slides") !== "0";
     $("#slidePanel").classList.toggle("off", !show);
@@ -4160,7 +4167,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     }
     menuEl2 = document.createElement("div");
     menuEl2.id = "insertMenu";
-    const items = isDeck(state.cur.html) ? [{ ic: "🎞", name: "Slide", slide: true }, ...INSERT_ITEMS] : INSERT_ITEMS;
+    const items = isSlideshow(state.cur) ? [{ ic: "🎞", name: "Slide", slide: true }, ...INSERT_ITEMS] : INSERT_ITEMS;
     menuEl2.innerHTML = items.map((it, i) => `<button data-i="${i}"><span class="iic">${it.ic}</span><span>${it.name}</span></button>`).join("") + '<div class="ihint">Inserts after the selected element — or at the end of the page.</div>';
     document.body.appendChild(menuEl2);
     const r = e.target.getBoundingClientRect();
@@ -4228,7 +4235,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     makeShareLink,
     shareFile,
     checkShareHash,
-    isDeck,
+    isSlideshow,
     addSlide,
     addSlideAfterSelection,
     dupSlide,

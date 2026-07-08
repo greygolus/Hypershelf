@@ -235,7 +235,7 @@ $('#btnNew').onclick=()=>{
     const t=TEMPLATES.find(x=>x.id===b.dataset.tpl);
     const name=$('#tplName').value.trim()||'Untitled.html';
     hideModal();
-    const f=await addFile(name,t.html);
+    const f=await addFile(name,t.html,t.tags?{tags:[...t.tags]}:{});
     state.filter.disk=false;
     renderLibrary();openFile(f.id);
   });

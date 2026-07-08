@@ -4,12 +4,20 @@ import { setMMode, renderFrame, flushSerialize, serializeSrc, refreshCodeText, s
   selectDisplayEl, srcEl, getDispDoc, HS } from './editor.js';
 import { histPush } from './history.js';
 
-/* ======================= slide filmstrip (decks only) =======================
-   The editor stays ONE editor: a file counts as a deck when it has 2+ <section>
-   elements (same rule Present uses), and only then do the 🎞 button, the
-   filmstrip sidebar, and the Insert "Slide" item appear. Documents see none of it. */
+/* ======================= slide filmstrip (slideshows only) =======================
+   The editor stays ONE editor, and slideshows are EXPLICIT (2+ sections was a
+   false-positive machine — plain documents use <section> too). A file gets the
+   🎞 button, the filmstrip, and the Insert "Slide" item only when:
+   - the shelf file carries a "slideshow" tag (the normal tags UI adds/removes it), or
+   - the file itself marks its body with data-hs-slideshow — that marker travels
+     with the file (share links, downloads, disk files) and is how the deck
+     template opts in. Everything else sees none of the slide UI. */
 
-function isDeck(html){return((html||'').match(/<section[\s>]/gi)||[]).length>=2}
+function isSlideshow(cur){
+  if(!cur)return false;
+  if((cur.tags||[]).some(t=>/^slide ?show$/i.test(t)))return true;
+  return/data-hs-slideshow/.test(cur.html||'');
+}
 function getSlides(doc){return[...doc.querySelectorAll('section')]}
 
 let activeSlide=0;
@@ -108,7 +116,7 @@ function renderPanel(){
   const html=state.cur.html;
   const n=(html.match(/<section[\s>]/gi)||[]).length;
   if(activeSlide>=n)activeSlide=Math.max(0,n-1);
-  list.innerHTML='';
+  list.innerHTML=n?'':'<div class="hint" style="padding:4px 2px">No slides yet — ＋ Add creates the first one.</div>';
   for(let i=0;i<n;i++){
     const t=document.createElement('div');t.className='sthumb'+(i===activeSlide?' active':'');
     t.innerHTML=`<div class="twrap"></div><span class="snum">${i+1}</span>
@@ -140,7 +148,7 @@ function renderPanel(){
 }
 /* visibility: 🎞 button only for decks; panel follows the persisted toggle */
 function refreshSlidesUI(){
-  const deck=!!state.cur&&isDeck(state.cur.html);
+  const deck=isSlideshow(state.cur);
   $('#btnSlides').classList.toggle('off',!deck);
   const show=deck&&localStorage.getItem('hs-slides')!=='0';
   $('#slidePanel').classList.toggle('off',!show);
@@ -157,4 +165,4 @@ $('#btnSlides').onclick=()=>{
 };
 $('#slideAdd').onclick=()=>addSlide(activeSlide);
 
-export { isDeck, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI };
+export { isSlideshow, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI };

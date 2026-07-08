@@ -1,7 +1,7 @@
 import { $, toast } from './utils.js';
 import { state } from './state.js';
 import { insertHtmlAfterSelection } from './editor.js';
-import { isDeck, addSlideAfterSelection } from './slides.js';
+import { isSlideshow, addSlideAfterSelection } from './slides.js';
 
 /* ======================= ＋ Insert palette ======================= */
 /* Templates use minimal inline styles so they inherit the document's look. */
@@ -26,8 +26,8 @@ $('#btnInsert').onclick=e=>{
   if(!state.cur)return;
   if(menuEl){closeInsertMenu();return}
   menuEl=document.createElement('div');menuEl.id='insertMenu';
-  /* decks get a Slide entry on top — adds after the slide holding the selection */
-  const items=isDeck(state.cur.html)
+  /* slideshows get a Slide entry on top — adds after the slide holding the selection */
+  const items=isSlideshow(state.cur)
     ?[{ic:'🎞',name:'Slide',slide:true},...INSERT_ITEMS]:INSERT_ITEMS;
   menuEl.innerHTML=items.map((it,i)=>
     `<button data-i="${i}"><span class="iic">${it.ic}</span><span>${it.name}</span></button>`).join('')+
