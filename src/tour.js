@@ -10,7 +10,7 @@ const TOUR=[
   {sel:'#diskSection',title:'Real files on your computer',
    text:'Connect any folder — even your Desktop (Chrome/Edge). Sites split across separate HTML, CSS and JS files open as ONE editable document, and Save writes every change back to the right file. The button below picks a folder and drops a small example site into it so you can try it right now.',
    action:{label:'📂 Connect a folder & add the example site',
-     run:async()=>{await connectFolder();if(state.disk.handle)await createExampleSite()}}},
+     run:async()=>{const d=await connectFolder();if(d)await createExampleSite(d)}}},
   {sel:'.side-footer',title:'Backups, theme & this tour',text:'Shelf files live in this browser — export a JSON backup to move or protect them. The light/dark toggle and a tour replay live here too.'},
   {sel:'#grid .card',title:'Start with the Welcome file',text:'It\'s an interactive playground: every editor feature — click-to-edit, drag, resize, "apply to all similar", 🎨 Colors, built-in fonts, ⌛ History, 🤖 AI — each with a small "try it" you can do in seconds.'}
 ];

@@ -14,6 +14,7 @@ import { $ } from './utils.js';
 import { idb, openDB } from './db.js';
 import { state } from './state.js';
 import { addFile, renderLibrary } from './library.js';
+import { activeDisk } from './disk.js';
 import { listDisk, bundleDiskHtml, preloadDiskAssets, applyAssetCache, saveDiskProject, resolveRel, createExampleSite, openDiskFile } from './disk.js';
 import { startTour } from './tour.js';
 import { renderFrame, syncNow, setDirty, saveCur, flushSerialize, selectDisplayEl, saveDraft, setCodeHighlight, refreshCodeText } from './editor.js';
@@ -27,7 +28,7 @@ import { WELCOME } from './welcome.js';
    so this is the deliberate window for debugging and automated tests */
 window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   renderFrame,syncNow,setDirty,saveCur,flushSerialize,selectDisplayEl,saveDraft,setCodeHighlight,refreshCodeText,
-  listDisk,bundleDiskHtml,preloadDiskAssets,applyAssetCache,saveDiskProject,resolveRel,createExampleSite,openDiskFile,
+  listDisk,bundleDiskHtml,preloadDiskAssets,applyAssetCache,saveDiskProject,resolveRel,createExampleSite,openDiskFile,activeDisk,renderLibrary,
   diffLines,renderDiffHTML,extractHtml,
   scanTheme,applyColorSwap,renderThemePanel,closeThemePanel,startTour,
   get themeScan(){return themeScan},get themeBase(){return themeBase},
@@ -44,13 +45,16 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   await openDB();
   state.files=await idb.all('files');
   state.folders=await idb.all('folders');
-  /* restore the connected disk folder, if any */
+  /* restore all connected disk folders (older versions stored a single record with id 'dir') */
   try{
-    const rec=await idb.get('handles','dir');
-    if(rec&&rec.handle){
-      state.disk.handle=rec.handle;state.disk.name=rec.handle.name;
-      const p=await rec.handle.queryPermission({mode:'readwrite'});
-      if(p==='granted')await listDisk();else state.disk.needsPerm=true;
+    for(const rec of await idb.all('handles')){
+      if(!rec.handle)continue;
+      const d={id:rec.id,handle:rec.handle,name:rec.handle.name,files:[],needsPerm:false};
+      state.disks.push(d);
+      try{
+        const p=await rec.handle.queryPermission({mode:'readwrite'});
+        if(p==='granted')await listDisk(d);else d.needsPerm=true;
+      }catch{d.needsPerm=true}
     }
   }catch{}
   if(!state.files.length&&!localStorage.getItem('hs-welcomed')){

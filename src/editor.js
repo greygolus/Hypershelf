@@ -214,6 +214,34 @@ function attachEditHandlers(doc){
     }
   },true);
   doc.addEventListener('scroll',()=>positionHandles(),true);
+  /* elements that can't sensibly take arbitrary children */
+  const NONEST=/^(img|br|hr|input|textarea|select|option|meta|link|style|script|iframe|canvas|svg|video|audio|source|track|wbr|area|base|col|embed|param|button)$/i;
+  const putBefore=ref=>{if(ref.previousElementSibling!==drag.el){ref.before(drag.el);drag.moved=true}};
+  const putAfter=ref=>{if(ref.nextElementSibling!==drag.el){ref.after(drag.el);drag.moved=true}};
+  /* drop INSIDE a container: position among its children by cursor (rows + columns + wraps) */
+  const placeInto=(container,e)=>{
+    if(container===drag.el||drag.el.contains(container))return;
+    let ref=null;
+    for(const c of container.children){
+      if(c===drag.el||!c.getAttribute||c.getAttribute(HS)===null)continue;
+      const cr=c.getBoundingClientRect();
+      if(e.clientY<cr.top||(e.clientY<=cr.bottom&&e.clientX<cr.left+cr.width/2)){ref=c;break}
+    }
+    if(ref)putBefore(ref);
+    else if(!(drag.el.parentElement===container&&drag.el===container.lastElementChild)){
+      container.append(drag.el);drag.moved=true;
+    }
+  };
+  /* do this element's siblings flow horizontally? decides which axis splits before/after */
+  const flowsHorizontally=el=>{
+    const sib=[el.previousElementSibling,el.nextElementSibling]
+      .find(s=>s&&s!==drag.el&&s.getAttribute&&s.getAttribute(HS)!==null);
+    if(!sib)return false;
+    const a=el.getBoundingClientRect(),b=sib.getBoundingClientRect();
+    /* same row only if the rects genuinely overlap vertically */
+    const ov=Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top);
+    return ov>Math.min(a.height,b.height)*.5;
+  };
   doc.body.addEventListener('mousemove',e=>{
     if(!drag||rz)return;
     if(!drag.active){
@@ -226,15 +254,39 @@ function attachEditHandlers(doc){
     }
     /* LIVE reorder: the element actually moves as you drag, so what you
        see during the drag is exactly what you get on release */
-    const t=doc.elementFromPoint(e.clientX,e.clientY);
-    const tgt=t&&t.closest('['+HS+']');
-    if(!tgt||tgt===drag.el||drag.el.contains(tgt))return;
-    const r=tgt.getBoundingClientRect();
-    if(e.clientY<r.top+r.height/2){
-      if(tgt.previousElementSibling!==drag.el){tgt.before(drag.el);drag.moved=true}
-    }else{
-      if(tgt.nextElementSibling!==drag.el){tgt.after(drag.el);drag.moved=true}
+    const hit=doc.elementFromPoint(e.clientX,e.clientY);
+    if(!hit)return;
+    const tgt=hit.closest?hit.closest('['+HS+']'):null;
+    if(!tgt){
+      /* page background — position among the body's top-level elements */
+      if(hit===doc.body||hit===doc.documentElement)placeInto(doc.body,e);
+      return;
     }
+    if(tgt===drag.el||drag.el.contains(tgt))return;
+    if(tgt===drag.el.parentElement){
+      /* over our own container's background: reposition within it — leaving a
+         container happens by moving onto something OUTSIDE it, never by grazing
+         its internal edges (that ejection was what made dragging feel random) */
+      placeInto(tgt,e);return;
+    }
+    const r=tgt.getBoundingClientRect();
+    const hasKids=[...tgt.children].some(c=>c!==drag.el&&c.getAttribute&&c.getAttribute(HS)!==null);
+    const emptyBox=!hasKids&&!tgt.textContent.trim();
+    const canNest=!NONEST.test(tgt.tagName)&&(hasKids||emptyBox);
+    const horiz=flowsHorizontally(tgt);
+    const pos=horiz?e.clientX:e.clientY;
+    const start=horiz?r.left:r.top,len=horiz?r.width:r.height;
+    if(!canNest){ /* leaves: pure halves — never nest */
+      (pos<start+len/2?putBefore:putAfter)(tgt);
+      return;
+    }
+    /* containers: edges drop beside, the middle drops inside */
+    const edge=tgt.parentElement===drag.el.parentElement
+      ?Math.max(len*.4,len/2-12) /* sibling containers: reorder dominates, small nest zone in the middle */
+      :Math.min(16,Math.max(6,len*.25)); /* other containers: thin edges, "inside" dominates */
+    if(pos<start+edge)putBefore(tgt);
+    else if(pos>start+len-edge)putAfter(tgt);
+    else placeInto(tgt,e);
   },true);
   const endDrag=(cancel)=>{
     const d=drag;drag=null;

@@ -32,7 +32,7 @@ $('#btnRedo').onclick=()=>histGo(1);
 
 /* ======================= version history (snapshot on every Save) ======================= */
 const VMAX=20;
-function verKey(){return state.cur.disk?'disk:'+state.cur.name:state.cur.id}
+function verKey(){return state.cur.disk?'disk:'+(state.cur.diskId||'')+':'+state.cur.name:state.cur.id}
 async function pushVersion(fileId,html){
   try{
     const all=(await idb.all('versions')).filter(v=>v.fileId===fileId).sort((a,b)=>b.ts-a.ts);

@@ -480,7 +480,8 @@
     files: [],
     folders: [],
     filter: { folder: null, tag: null, q: "", disk: false },
-    disk: { handle: null, name: "", files: [], needsPerm: false },
+    disks: [],
+    /* [{id,handle,name,files:[],needsPerm}] — connected real folders */
     cur: null,
     mmode: "interact",
     codeOpen: false,
@@ -969,7 +970,7 @@
   $("#btnRedo").onclick = () => histGo(1);
   var VMAX = 20;
   function verKey() {
-    return state.cur.disk ? "disk:" + state.cur.name : state.cur.id;
+    return state.cur.disk ? "disk:" + (state.cur.diskId || "") + ":" + state.cur.name : state.cur.id;
   }
   async function pushVersion(fileId, html) {
     try {
@@ -1302,6 +1303,43 @@
       }
     }, true);
     doc.addEventListener("scroll", () => positionHandles(), true);
+    const NONEST = /^(img|br|hr|input|textarea|select|option|meta|link|style|script|iframe|canvas|svg|video|audio|source|track|wbr|area|base|col|embed|param|button)$/i;
+    const putBefore = (ref) => {
+      if (ref.previousElementSibling !== drag.el) {
+        ref.before(drag.el);
+        drag.moved = true;
+      }
+    };
+    const putAfter = (ref) => {
+      if (ref.nextElementSibling !== drag.el) {
+        ref.after(drag.el);
+        drag.moved = true;
+      }
+    };
+    const placeInto = (container, e) => {
+      if (container === drag.el || drag.el.contains(container)) return;
+      let ref = null;
+      for (const c of container.children) {
+        if (c === drag.el || !c.getAttribute || c.getAttribute(HS) === null) continue;
+        const cr = c.getBoundingClientRect();
+        if (e.clientY < cr.top || e.clientY <= cr.bottom && e.clientX < cr.left + cr.width / 2) {
+          ref = c;
+          break;
+        }
+      }
+      if (ref) putBefore(ref);
+      else if (!(drag.el.parentElement === container && drag.el === container.lastElementChild)) {
+        container.append(drag.el);
+        drag.moved = true;
+      }
+    };
+    const flowsHorizontally = (el) => {
+      const sib = [el.previousElementSibling, el.nextElementSibling].find((s) => s && s !== drag.el && s.getAttribute && s.getAttribute(HS) !== null);
+      if (!sib) return false;
+      const a = el.getBoundingClientRect(), b = sib.getBoundingClientRect();
+      const ov = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      return ov > Math.min(a.height, b.height) * 0.5;
+    };
     doc.body.addEventListener("mousemove", (e) => {
       if (!drag || rz) return;
       if (!drag.active) {
@@ -1313,21 +1351,33 @@
         drag.el.style.pointerEvents = "none";
         drag.el.setAttribute("data-hs-dragging", "");
       }
-      const t = doc.elementFromPoint(e.clientX, e.clientY);
-      const tgt = t && t.closest("[" + HS + "]");
-      if (!tgt || tgt === drag.el || drag.el.contains(tgt)) return;
-      const r = tgt.getBoundingClientRect();
-      if (e.clientY < r.top + r.height / 2) {
-        if (tgt.previousElementSibling !== drag.el) {
-          tgt.before(drag.el);
-          drag.moved = true;
-        }
-      } else {
-        if (tgt.nextElementSibling !== drag.el) {
-          tgt.after(drag.el);
-          drag.moved = true;
-        }
+      const hit = doc.elementFromPoint(e.clientX, e.clientY);
+      if (!hit) return;
+      const tgt = hit.closest ? hit.closest("[" + HS + "]") : null;
+      if (!tgt) {
+        if (hit === doc.body || hit === doc.documentElement) placeInto(doc.body, e);
+        return;
       }
+      if (tgt === drag.el || drag.el.contains(tgt)) return;
+      if (tgt === drag.el.parentElement) {
+        placeInto(tgt, e);
+        return;
+      }
+      const r = tgt.getBoundingClientRect();
+      const hasKids = [...tgt.children].some((c) => c !== drag.el && c.getAttribute && c.getAttribute(HS) !== null);
+      const emptyBox = !hasKids && !tgt.textContent.trim();
+      const canNest = !NONEST.test(tgt.tagName) && (hasKids || emptyBox);
+      const horiz = flowsHorizontally(tgt);
+      const pos = horiz ? e.clientX : e.clientY;
+      const start = horiz ? r.left : r.top, len = horiz ? r.width : r.height;
+      if (!canNest) {
+        (pos < start + len / 2 ? putBefore : putAfter)(tgt);
+        return;
+      }
+      const edge = tgt.parentElement === drag.el.parentElement ? Math.max(len * 0.4, len / 2 - 12) : Math.min(16, Math.max(6, len * 0.25));
+      if (pos < start + edge) putBefore(tgt);
+      else if (pos > start + len - edge) putAfter(tgt);
+      else placeInto(tgt, e);
     }, true);
     const endDrag = (cancel) => {
       const d = drag;
@@ -2003,82 +2053,104 @@
   };
 
   // src/disk.js
+  function activeDisk() {
+    return state.disks.find((d) => d.id === state.filter.disk) || null;
+  }
   function renderDiskSection() {
     const el = $("#diskSection");
     if (!window.showDirectoryPicker) {
       el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:0 4px">Direct folder access needs Chrome or Edge.</div>';
       return;
     }
-    if (!state.disk.handle) {
-      el.innerHTML = '<button class="ghost" id="btnOpenFolder" style="text-align:left">📂 Open folder…</button>';
-      $("#btnOpenFolder").onclick = connectFolder;
-      return;
-    }
-    el.innerHTML = `
-    <div class="navitem${state.filter.disk ? " active" : ""}" id="diskNav" title="${state.disk.needsPerm ? "Click to reconnect" : "Files edited here save straight to disk"}">
-      <span>💻</span><span>${esc(state.disk.name)}${state.disk.needsPerm ? " ⚠" : ""}</span>
-      <button class="del" id="diskX" title="Disconnect folder">✕</button>
-      <span class="count">${state.disk.needsPerm ? "" : state.disk.files.length}</span>
-    </div>
+    el.innerHTML = state.disks.map((d) => `
+    <div class="navitem${state.filter.disk === d.id ? " active" : ""}" data-disk-id="${d.id}" title="${d.needsPerm ? "Click to reconnect" : "Files edited here save straight to disk"}">
+      <span>💻</span><span>${esc(d.name)}${d.needsPerm ? " ⚠" : ""}</span>
+      <button class="del" data-x="1" title="Disconnect folder">✕</button>
+      <span class="count">${d.needsPerm ? "" : d.files.length}</span>
+    </div>`).join("") + `<button class="ghost" id="btnOpenFolder" style="text-align:left${state.disks.length ? ";font-size:11px" : ""}">📂 ${state.disks.length ? "Add another folder…" : "Open folder…"}</button>` + (activeDisk() && !activeDisk().needsPerm ? `
     <button class="ghost" id="btnRefreshDisk" style="text-align:left;font-size:11px">↻ Refresh list</button>
-    <button class="ghost" id="btnExample" style="text-align:left;font-size:11px" title="Writes a small multi-file demo site (html + css + js) into the connected folder">⊕ Create example site</button>`;
-    $("#diskNav").onclick = async (e) => {
-      if (e.target.id === "diskX") {
-        disconnectFolder();
-        return;
-      }
-      if (state.disk.needsPerm) {
-        try {
-          const p = await state.disk.handle.requestPermission({ mode: "readwrite" });
-          if (p !== "granted") return toast("Folder access was denied");
-          state.disk.needsPerm = false;
-          await listDisk();
-        } catch {
-          return toast("Could not reconnect to the folder");
+    <button class="ghost" id="btnExample" style="text-align:left;font-size:11px" title="Writes a small multi-file demo site (html + css + js) into this folder">⊕ Create example site</button>` : "");
+    $("#btnOpenFolder").onclick = connectFolder;
+    el.querySelectorAll(".navitem").forEach((nav) => {
+      nav.onclick = async (e) => {
+        const d = state.disks.find((x) => x.id === nav.dataset.diskId);
+        if (!d) return;
+        if (e.target.dataset.x) {
+          disconnectFolder(d.id);
+          return;
         }
-      }
-      state.filter.disk = true;
-      state.filter.folder = null;
-      state.filter.tag = null;
+        if (d.needsPerm) {
+          try {
+            const p = await d.handle.requestPermission({ mode: "readwrite" });
+            if (p !== "granted") return toast("Folder access was denied");
+            d.needsPerm = false;
+            await listDisk(d);
+          } catch {
+            return toast("Could not reconnect to the folder");
+          }
+        }
+        state.filter.disk = d.id;
+        state.filter.folder = null;
+        state.filter.tag = null;
+        renderLibrary();
+      };
+    });
+    const rf = $("#btnRefreshDisk");
+    if (rf) rf.onclick = async () => {
+      const d = activeDisk();
+      if (d) await listDisk(d);
       renderLibrary();
     };
-    $("#btnRefreshDisk").onclick = async () => {
-      await listDisk();
-      renderLibrary();
+    const ex = $("#btnExample");
+    if (ex) ex.onclick = () => {
+      const d = activeDisk();
+      if (d) createExampleSite(d);
     };
-    $("#btnExample").onclick = createExampleSite;
   }
   async function connectFolder() {
     try {
       const handle = await showDirectoryPicker({ mode: "readwrite" });
-      state.disk.handle = handle;
-      state.disk.name = handle.name;
-      state.disk.needsPerm = false;
+      for (const d2 of state.disks) {
+        try {
+          if (await d2.handle.isSameEntry(handle)) {
+            state.filter.disk = d2.id;
+            state.filter.folder = null;
+            state.filter.tag = null;
+            renderLibrary();
+            return d2;
+          }
+        } catch {
+        }
+      }
+      const d = { id: uid(), handle, name: handle.name, files: [], needsPerm: false };
+      state.disks.push(d);
       try {
-        await idb.put("handles", { id: "dir", handle });
+        await idb.put("handles", { id: d.id, handle });
       } catch {
       }
-      await listDisk();
-      state.filter.disk = true;
+      await listDisk(d);
+      state.filter.disk = d.id;
       state.filter.folder = null;
       state.filter.tag = null;
       renderLibrary();
+      return d;
     } catch {
+      return null;
     }
   }
-  async function listDisk() {
-    state.disk.files = [];
-    if (!state.disk.handle) return;
+  async function listDisk(d) {
+    if (!d || !d.handle) return;
+    d.files = [];
     try {
       async function walk(dir, prefix, depth) {
         for await (const h of dir.values()) {
-          if (h.kind === "file" && /\.html?$/i.test(h.name)) state.disk.files.push({ name: prefix + h.name, handle: h });
+          if (h.kind === "file" && /\.html?$/i.test(h.name)) d.files.push({ name: prefix + h.name, handle: h });
           else if (h.kind === "directory" && depth < 3 && !/^(node_modules|\.git|\.next|dist|build|\.vercel)$/i.test(h.name))
             await walk(h, prefix + h.name + "/", depth + 1);
         }
       }
-      await walk(state.disk.handle, "", 0);
-      state.disk.files.sort((a, b) => a.name.localeCompare(b.name));
+      await walk(d.handle, "", 0);
+      d.files.sort((a, b) => a.name.localeCompare(b.name));
     } catch {
       toast("Could not read the folder");
     }
@@ -2174,7 +2246,7 @@ ${text}
     return html;
   }
   async function saveDiskProject(cur, html) {
-    const root = state.disk.handle, assets = cur.assets || {}, writes = [];
+    const root = cur.root, assets = cur.assets || {}, writes = [];
     html = html.replace(/<style\b[^>]*\bdata-hs-src="([^"]+)"[^>]*>\n?([\s\S]*?)\n?<\/style>/gi, (m, path, css) => {
       writes.push({ path, text: css });
       return assets[path] && assets[path].origTag || `<link rel="stylesheet" href="${path}">`;
@@ -2421,43 +2493,50 @@ document.querySelectorAll('.card').forEach((card, i) => {
   <path d="M25 20c0-3 2-3 2-6M31 20c0-3 2-3 2-6" stroke="#cbb59e" stroke-width="2.5" fill="none" stroke-linecap="round"/>
 </svg>`
   };
-  async function createExampleSite() {
-    if (!state.disk.handle) return;
+  async function createExampleSite(d) {
+    d = d || activeDisk();
+    if (!d || !d.handle) return;
     try {
       for (const [path, text] of Object.entries(DEMO_FILES)) {
-        const fh = await getFileByPath(state.disk.handle, path, true);
+        const fh = await getFileByPath(d.handle, path, true);
         const w = await fh.createWritable();
         await w.write(text);
         await w.close();
       }
-      await listDisk();
+      await listDisk(d);
       renderLibrary();
       toast("Example site created — open hypershelf-example/index.html");
     } catch (err) {
       toast("Could not create the example: " + err.message);
     }
   }
-  async function disconnectFolder() {
-    state.disk = { handle: null, name: "", files: [], needsPerm: false };
-    state.filter.disk = false;
+  async function disconnectFolder(id) {
+    state.disks = state.disks.filter((d) => d.id !== id);
+    if (state.filter.disk === id) state.filter.disk = false;
     try {
-      await idb.del("handles", "dir");
+      await idb.del("handles", id);
     } catch {
     }
     renderLibrary();
   }
   var diskThumbObserver;
   function renderDiskGrid() {
+    const d = activeDisk();
+    if (!d) {
+      state.filter.disk = false;
+      renderLibrary();
+      return;
+    }
     const q = state.filter.q.toLowerCase();
-    const files = state.disk.files.filter((f) => !q || f.name.toLowerCase().includes(q));
-    $("#libTitle").textContent = "💻 " + state.disk.name;
+    const files = d.files.filter((f) => !q || f.name.toLowerCase().includes(q));
+    $("#libTitle").textContent = "💻 " + d.name;
     $("#libCount").textContent = files.length + (files.length === 1 ? " file" : " files") + " on disk — edits save directly to the real files";
     const grid2 = $("#grid");
     if (!files.length) {
       grid2.innerHTML = `<div class="empty"><div class="big">💻</div>No .html files in this folder.<br>
       <button class="primary" id="btnExample2" style="margin-top:16px">⊕ Create an example site here</button><br>
       <span style="font-size:12px">Writes a small demo (html + css + js in separate files) so you can try multi-file editing.</span></div>`;
-      $("#btnExample2").onclick = createExampleSite;
+      $("#btnExample2").onclick = () => createExampleSite(d);
       return;
     }
     grid2.innerHTML = files.map((f, i) => `
@@ -2482,7 +2561,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
             en.target.querySelector(".fdate").textContent = fmtDate(file.lastModified);
             let src = await file.text();
             try {
-              src = (await bundleDiskHtml(state.disk.handle, f.name, src, { withScripts: false })).html;
+              src = (await bundleDiskHtml(d.handle, f.name, src, { withScripts: false })).html;
             } catch {
             }
             const ifr = document.createElement("iframe");
@@ -2503,14 +2582,14 @@ document.querySelectorAll('.card').forEach((card, i) => {
         const f = files[+card.dataset.disk];
         if (!f) return;
         if (e.target.classList.contains("menu-btn")) {
-          openDiskMenu(e.target, f);
+          openDiskMenu(e.target, d, f);
           return;
         }
-        openDiskFile(f);
+        openDiskFile(d, f);
       };
     });
   }
-  function openDiskMenu(btn, f) {
+  function openDiskMenu(btn, d, f) {
     closeMenu();
     const m = document.createElement("div");
     m.className = "dropdown";
@@ -2527,7 +2606,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
       if (!a) return;
       closeMenu();
       try {
-        if (a === "open") openDiskFile(f);
+        if (a === "open") openDiskFile(d, f);
         if (a === "import") {
           const file = await f.handle.getFile();
           await addFile(f.name, await file.text());
@@ -2542,20 +2621,20 @@ document.querySelectorAll('.card').forEach((card, i) => {
       }
     };
   }
-  async function openDiskFile(f) {
+  async function openDiskFile(d, f) {
     try {
       const file = await f.handle.getFile();
       const raw = await file.text();
       let html = raw, assets = {}, assetCache = /* @__PURE__ */ new Map();
       try {
-        const b = await bundleDiskHtml(state.disk.handle, f.name, raw);
+        const b = await bundleDiskHtml(d.handle, f.name, raw);
         html = b.html;
         assets = b.assets;
-        assetCache = await preloadDiskAssets(state.disk.handle, b.base, html);
+        assetCache = await preloadDiskAssets(d.handle, b.base, html);
         if (b.warns.length) toast("Could not load linked file(s): " + b.warns.slice(0, 3).join(", "));
       } catch {
       }
-      state.cur = { id: null, disk: true, handle: f.handle, name: f.name, html, assets, assetCache };
+      state.cur = { id: null, disk: true, diskId: d.id, root: d.handle, handle: f.handle, name: f.name, html, assets, assetCache };
       state.srcDoc = null;
       state.selEl = null;
       setDirty(false);
@@ -3189,8 +3268,8 @@ document.querySelectorAll('.card').forEach((card, i) => {
       action: {
         label: "📂 Connect a folder & add the example site",
         run: async () => {
-          await connectFolder();
-          if (state.disk.handle) await createExampleSite();
+          const d = await connectFolder();
+          if (d) await createExampleSite(d);
         }
       }
     },
@@ -3284,6 +3363,8 @@ document.querySelectorAll('.card').forEach((card, i) => {
     resolveRel,
     createExampleSite,
     openDiskFile,
+    activeDisk,
+    renderLibrary,
     diffLines,
     renderDiffHTML,
     extractHtml,
@@ -3317,13 +3398,17 @@ document.querySelectorAll('.card').forEach((card, i) => {
     state.files = await idb.all("files");
     state.folders = await idb.all("folders");
     try {
-      const rec = await idb.get("handles", "dir");
-      if (rec && rec.handle) {
-        state.disk.handle = rec.handle;
-        state.disk.name = rec.handle.name;
-        const p = await rec.handle.queryPermission({ mode: "readwrite" });
-        if (p === "granted") await listDisk();
-        else state.disk.needsPerm = true;
+      for (const rec of await idb.all("handles")) {
+        if (!rec.handle) continue;
+        const d = { id: rec.id, handle: rec.handle, name: rec.handle.name, files: [], needsPerm: false };
+        state.disks.push(d);
+        try {
+          const p = await rec.handle.queryPermission({ mode: "readwrite" });
+          if (p === "granted") await listDisk(d);
+          else d.needsPerm = true;
+        } catch {
+          d.needsPerm = true;
+        }
       }
     } catch {
     }
