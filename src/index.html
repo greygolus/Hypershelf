@@ -70,6 +70,7 @@
         <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
         <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
         <button id="btnPresent" title="Present fullscreen — ←/→ to move between slides, Esc to exit">▶</button>
+        <button id="btnSlides" class="off" title="Slide filmstrip — jump, add, reorder slides">🎞 Slides</button>
         <select id="widthSel" title="Preview width">
           <option value="">Full width</option>
           <option value="1024">1024 px</option>
@@ -80,11 +81,15 @@
       <button id="btnColors" title="See and edit every color and font in this file">🎨 Colors</button>
       <button id="btnHistory" title="Snapshots stored on every Save">⌛ History</button>
       <button id="btnAI" title="Round-trip this file through any AI chat">🤖 AI</button>
-      <button id="btnShare" title="Copy a link that carries this whole file inside it — no upload, the recipient gets their own copy">🔗 Share</button>
       <button id="btnDownload">Download</button>
       <button class="primary" id="btnSave">Save</button>
+      <button id="btnShare" title="Copy a link that carries this whole file inside it — no upload, the recipient gets their own copy">🔗 Share</button>
     </div>
     <div class="ed-body">
+      <div id="slidePanel" class="off">
+        <div class="sphead"><span>Slides</span><button id="slideAdd" title="Add a slide after the current one">＋ Add</button></div>
+        <div id="slideList"></div>
+      </div>
       <div id="frameWrap"></div>
       <div id="codeResizer" class="off" title="Drag to resize"></div>
       <div id="codePanel" class="off">

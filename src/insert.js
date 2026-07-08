@@ -1,6 +1,7 @@
 import { $, toast } from './utils.js';
 import { state } from './state.js';
 import { insertHtmlAfterSelection } from './editor.js';
+import { isDeck, addSlideAfterSelection } from './slides.js';
 
 /* ======================= ＋ Insert palette ======================= */
 /* Templates use minimal inline styles so they inherit the document's look. */
@@ -25,7 +26,10 @@ $('#btnInsert').onclick=e=>{
   if(!state.cur)return;
   if(menuEl){closeInsertMenu();return}
   menuEl=document.createElement('div');menuEl.id='insertMenu';
-  menuEl.innerHTML=INSERT_ITEMS.map((it,i)=>
+  /* decks get a Slide entry on top — adds after the slide holding the selection */
+  const items=isDeck(state.cur.html)
+    ?[{ic:'🎞',name:'Slide',slide:true},...INSERT_ITEMS]:INSERT_ITEMS;
+  menuEl.innerHTML=items.map((it,i)=>
     `<button data-i="${i}"><span class="iic">${it.ic}</span><span>${it.name}</span></button>`).join('')+
     '<div class="ihint">Inserts after the selected element — or at the end of the page.</div>';
   document.body.appendChild(menuEl);
@@ -33,9 +37,10 @@ $('#btnInsert').onclick=e=>{
   menuEl.style.top=(r.bottom+6)+'px';
   menuEl.style.left=Math.max(8,Math.min(r.left,innerWidth-240))+'px';
   menuEl.querySelectorAll('button').forEach(b=>b.onclick=()=>{
-    const it=INSERT_ITEMS[+b.dataset.i];
+    const it=items[+b.dataset.i];
     closeInsertMenu();
-    if(it.img)$('#imgInput').click();
+    if(it.slide)addSlideAfterSelection();
+    else if(it.img)$('#imgInput').click();
     else insertHtmlAfterSelection(it.html);
   });
   setTimeout(()=>document.addEventListener('mousedown',onOutside,true),0);

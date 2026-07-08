@@ -12,6 +12,7 @@ import './colors.js';
 import './tour.js';
 import './insert.js';
 import './share.js';
+import './slides.js';
 import { $ } from './utils.js';
 import { idb, openDB } from './db.js';
 import { state } from './state.js';
@@ -26,6 +27,7 @@ import { extractHtml } from './ai.js';
 import { scanTheme, applyColorSwap, renderThemePanel, closeThemePanel, themeScan, themeBase, themeOrig, themeHist } from './colors.js';
 import { WELCOME } from './welcome.js';
 import { makeShareLink, shareFile, checkShareHash } from './share.js';
+import { isDeck, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI } from './slides.js';
 
 /* console/debug handle — the bundle keeps internals out of the global scope,
    so this is the deliberate window for debugging and automated tests */
@@ -35,6 +37,7 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   diffLines,renderDiffHTML,extractHtml,
   scanTheme,applyColorSwap,renderThemePanel,closeThemePanel,startTour,
   makeShareLink,shareFile,checkShareHash,
+  isDeck,addSlide,addSlideAfterSelection,dupSlide,delSlide,moveSlide,focusSlide,refreshSlidesUI,
   get themeScan(){return themeScan},get themeBase(){return themeBase},
   get themeOrig(){return themeOrig},get themeHist(){return themeHist}};
 

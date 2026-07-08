@@ -27,12 +27,22 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - `src/diff.js`, `src/ai.js`, `src/colors.js`, `src/tour.js` — line diff, AI round-trip, 🎨 Colors panel, tour
 - `src/welcome.js` — the `WELCOME` playground HTML constant (own module so both `main.js` seed and `library.js` "＋ Example file" button import it without a circular dep)
 - `src/share.js` — share links: deflate+base64url a `{n,h}` payload into the URL hash (`#s=…`), incoming-link confirm modal, 🔗 toolbar + card-menu wiring
+- `src/slides.js` — deck-aware slide filmstrip: detection, thumbnails, add/duplicate/delete/move ops, Insert "Slide" entry hook
 - `src/main.js` — init, Welcome seed, analytics injection, and **`window.hs`** — the deliberate debug/test handle (the bundle keeps everything else off the global scope; automated tests drive the app through `hs.*`)
 
 **Regenerate the Welcome file:** `library.js#addWelcomeFile()` adds a fresh copy of `WELCOME` to the shelf and opens it — wired to `#btnWelcome` (sidebar footer "📚 Add example file") and `#btnWelcome2` (empty-shelf state). Mirrors disk mode's `createExampleSite`.
 
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
+
+**Added in v1.12 (July 8 2026) — deck-aware editor (slides filmstrip):**
+- **One editor, not two apps** (decided with Grey): a file counts as a **deck** when `state.cur.html` has ≥2 `<section>` elements (`isDeck`, regex count — same slide rule as Present). Only then do the 🎞 Slides toolbar button, the filmstrip, and the Insert "Slide" entry exist; documents see none of it.
+- **Filmstrip sidebar** (`src/slides.js`, `#slidePanel` left of `#frameWrap`) — one 16:9 thumbnail per slide: full document in a `sandbox=""` iframe (1280×720 scaled to 0.1344), scripts set `type=text/plain`, every other section hidden via injected `[data-hs-thumbhide]{display:none}`. Click = jump + select that section (auto-switches to Edit; polls `getDispDoc()` for the fresh iframe). Hover ops per slide: ＋ add after, ⧉ duplicate, ↑/↓ move, ✕ delete (blocked on the last slide); ＋ Add in the header. Toggle persists as `localStorage['hs-slides']` ('0' = closed; default open).
+- **Structural ops go through the normal edit pipeline** (`withEdit`): ensure Edit mode → `flushSerialize` → mutate `state.srcDoc` → `serializeSrc`+`histPush`+`setDirty`+`renderFrame`+`refreshCodeText` — so undo, versions, drafts, code panel all just work. Duplicate strips `data-hs-id` from the clone tree (ids must stay unique).
+- **New slides inherit the deck's BASE class** — the intersection of every slide's classList (deck template slides are `slide title` / `slide` / `slide accent` → new slide gets plain `slide`; modifiers must not leak). Empty intersection on a class-less deck yields an empty class — correct, matches the deck.
+- **Editor→panel sync via window events**, no import cycle: `renderFrame` and `showLibrary` dispatch `hs-rendered`, `doSerialize` dispatches `hs-edited`; slides.js listens with a 300ms-debounced refresh. `getDispDoc()` accessor exported from editor.js.
+- 🔗 **Share moved to the right of Save** (was hidden mid-toolbar).
+- ⚠ Test-automation note: `openFile` is NOT on `window.hs` — open files by clicking `.card[data-id]`. Reopening a file with an unsaved draft fires a native `confirm()` (draft recovery) which BLOCKS headless automation — override `window.confirm` before clicking, or the eval renderer hangs and the preview must be restarted.
 
 **Added in v1.11 (July 8 2026) — share links:**
 - **The link IS the file** (`src/share.js`) — no upload, no backend: `makeShareLink(name,html)` JSON-encodes `{n:name,h:html}`, deflates it with the native `CompressionStream('deflate-raw')` (zero dependencies), base64url-encodes (unpadded, `-_` alphabet) and appends as `#s=…`. The hash never reaches any server. Base URL is `location.origin+pathname` when served over http(s), else the deployed `https://hypershelf.vercel.app/` (so file:// copies mint working links). Chunked `String.fromCharCode.apply` in the encoder avoids call-stack overflow on big files.

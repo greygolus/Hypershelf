@@ -39,6 +39,7 @@ function showLibrary(){
   /* free iframe memory */
   $('#frameWrap').innerHTML='';$('#codeTa').value='';$('#codeBack').innerHTML='';
   state.cur=null;state.srcDoc=null;state.selEl=null;renderLibrary();
+  dispatchEvent(new CustomEvent('hs-rendered')); /* lets the slides filmstrip hide itself */
 }
 $('#btnBack').onclick=async()=>{
   if(state.dirty){
@@ -140,9 +141,11 @@ function renderFrame(){
     renderInspector(null);
   }
   applyPreviewWidth();
+  dispatchEvent(new CustomEvent('hs-rendered')); /* panels that mirror the document (slides filmstrip) re-sync here */
 }
 /* ---------- resize handles (E / S / SE on the selected element) ---------- */
 let dispDoc=null;
+function getDispDoc(){return dispDoc}
 function ensureHandles(doc){
   let box=doc.getElementById('hsHandles');
   if(box)return box;
@@ -411,7 +414,8 @@ let serialT=null;
 function scheduleSerialize(){setDirty(true);clearTimeout(serialT);
   serialT=setTimeout(doSerialize,300)}
 function doSerialize(){serialT=null;
-  if(state.srcDoc&&state.mmode==='edit'){state.cur.html=serializeSrc();histPush(state.cur.html);refreshCodeText()}}
+  if(state.srcDoc&&state.mmode==='edit'){state.cur.html=serializeSrc();histPush(state.cur.html);refreshCodeText();
+    dispatchEvent(new CustomEvent('hs-edited'))}}
 function flushSerialize(){if(serialT){clearTimeout(serialT);doSerialize()}}
 /* always-inline dual-apply (resize handles use this directly — sizing is per-element) */
 function applyInlineStyle(prop,val){
@@ -907,4 +911,4 @@ $('#codeResizer').onmousedown=e=>{
 };
 
 
-export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft, insertHtmlAfterSelection };
+export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, getDispDoc, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft, insertHtmlAfterSelection };
