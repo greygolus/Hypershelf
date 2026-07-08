@@ -11,6 +11,7 @@ import './ai.js';
 import './colors.js';
 import './tour.js';
 import './insert.js';
+import './share.js';
 import { $ } from './utils.js';
 import { idb, openDB } from './db.js';
 import { state } from './state.js';
@@ -24,6 +25,7 @@ import { diffLines, renderDiffHTML } from './diff.js';
 import { extractHtml } from './ai.js';
 import { scanTheme, applyColorSwap, renderThemePanel, closeThemePanel, themeScan, themeBase, themeOrig, themeHist } from './colors.js';
 import { WELCOME } from './welcome.js';
+import { makeShareLink, shareFile, checkShareHash } from './share.js';
 
 /* console/debug handle — the bundle keeps internals out of the global scope,
    so this is the deliberate window for debugging and automated tests */
@@ -32,6 +34,7 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   listDisk,bundleDiskHtml,preloadDiskAssets,applyAssetCache,saveDiskProject,resolveRel,createExampleSite,openDiskFile,activeDisk,renderLibrary,
   diffLines,renderDiffHTML,extractHtml,
   scanTheme,applyColorSwap,renderThemePanel,closeThemePanel,startTour,
+  makeShareLink,shareFile,checkShareHash,
   get themeScan(){return themeScan},get themeBase(){return themeBase},
   get themeOrig(){return themeOrig},get themeHist(){return themeHist}};
 
@@ -63,5 +66,6 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
     await addFile('Welcome to Hypershelf.html',WELCOME,{tags:['guide']});
   }
   renderLibrary();
+  checkShareHash(); /* someone opened a share link — offer to add the file */
   if(!localStorage.getItem('hs-toured'))setTimeout(startTour,500);
 })();

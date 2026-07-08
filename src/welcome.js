@@ -66,6 +66,7 @@ export const WELCOME=`<!DOCTYPE html>
   <h2 class="sec">Real files on your computer</h2>
   <div class="tip"><b>📂 This computer</b> (sidebar) connects a real folder — sites with separate HTML/CSS/JS files open as one editable document, and one Save writes every file back.
     <span class="try">connect a folder and click <b>⊕ Create example site</b> for a hands-on multi-file demo.</span></div>
+  <div class="tip"><b>🔗 Share</b> (top bar) copies a link with the entire file compressed inside it — no upload, no account. Anyone who opens the link gets their own copy to keep.</div>
   <div class="tip">Shelf files live in <b>this browser</b> — use <b>⇩ Export library backup</b> to move or protect them.</div>
 </main>
 </body>

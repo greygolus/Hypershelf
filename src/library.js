@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { renderDiskGrid, renderDiskSection } from './disk.js';
 import { hideModal, showModal } from './ui.js';
 import { openFile } from './editor.js';
+import { shareFile } from './share.js';
 import { WELCOME } from './welcome.js';
 import { TEMPLATES } from './templates.js';
 
@@ -106,6 +107,7 @@ function openCardMenu(btn,id){
     <button data-a="move">Move to folder…</button>
     <button data-a="tags">Edit tags…</button>
     <button data-a="dup">Duplicate</button>
+    <button data-a="share">Copy share link</button>
     <button data-a="dl">Download</button>
     <button data-a="del" class="danger">Delete</button>`;
   document.body.appendChild(m);
@@ -121,6 +123,7 @@ function openCardMenu(btn,id){
     if(a==='dup'){const c={...f,id:uid(),name:f.name.replace(/(\.html?)?$/i,' copy$1'),
       created:Date.now(),modified:Date.now()};
       state.files.push(c);await idb.put('files',c);renderLibrary();toast('Duplicated')}
+    if(a==='share')shareFile(f.name,f.html);
     if(a==='dl')downloadFile(f);
     if(a==='del'&&confirm(`Delete "${f.name}"? This can't be undone.`)){
       state.files=state.files.filter(x=>x.id!==id);await idb.del('files',id);

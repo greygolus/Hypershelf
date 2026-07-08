@@ -26,12 +26,20 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 - `src/history.js` — undo/redo stack + version snapshots/modal
 - `src/diff.js`, `src/ai.js`, `src/colors.js`, `src/tour.js` — line diff, AI round-trip, 🎨 Colors panel, tour
 - `src/welcome.js` — the `WELCOME` playground HTML constant (own module so both `main.js` seed and `library.js` "＋ Example file" button import it without a circular dep)
+- `src/share.js` — share links: deflate+base64url a `{n,h}` payload into the URL hash (`#s=…`), incoming-link confirm modal, 🔗 toolbar + card-menu wiring
 - `src/main.js` — init, Welcome seed, analytics injection, and **`window.hs`** — the deliberate debug/test handle (the bundle keeps everything else off the global scope; automated tests drive the app through `hs.*`)
 
 **Regenerate the Welcome file:** `library.js#addWelcomeFile()` adds a fresh copy of `WELCOME` to the shelf and opens it — wired to `#btnWelcome` (sidebar footer "📚 Add example file") and `#btnWelcome2` (empty-shelf state). Mirrors disk mode's `createExampleSite`.
 
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
+
+**Added in v1.11 (July 8 2026) — share links:**
+- **The link IS the file** (`src/share.js`) — no upload, no backend: `makeShareLink(name,html)` JSON-encodes `{n:name,h:html}`, deflates it with the native `CompressionStream('deflate-raw')` (zero dependencies), base64url-encodes (unpadded, `-_` alphabet) and appends as `#s=…`. The hash never reaches any server. Base URL is `location.origin+pathname` when served over http(s), else the deployed `https://hypershelf.vercel.app/` (so file:// copies mint working links). Chunked `String.fromCharCode.apply` in the encoder avoids call-stack overflow on big files.
+- **Outgoing**: 🔗 Share button in the editor toolbar (`syncNow()` first) + "Copy share link" in the card menu → `shareFile` copies the link and toasts. Links >8000 chars get a size warning in the toast (chat apps truncate long URLs — Download travels safer). If `navigator.clipboard` is blocked, a fallback modal shows the link in a readonly input for manual copy (an INPUT, not a textarea — ui.js's Escape handler confirm-prompts on non-empty modal textareas).
+- **Incoming**: `checkShareHash()` (called at init after `renderLibrary`, plus a `hashchange` listener for links pasted into an open tab) parses `#s=`, inflates, and shows a **confirm modal** — file name, size, sandboxed preview iframe (`.shprev`) — before anything is written. "Add to my shelf" adds a copy via `addFile`, resets filters, opens it; "Not now" adds nothing. Both paths clear the hash via `history.replaceState`. Damaged/truncated links toast an error and clear the hash; nothing is added.
+- Welcome playground gained a 🔗 Share tip (existing seeded copies keep the old text — re-add via 📚).
+- Requires `CompressionStream` (Chrome 103+, Edge, Safari 16.4+, Firefox 113+) — same era as the File System Access API the app already leans on.
 
 **Added in v1.10 (July 8 2026) — create from nothing + presenter:**
 - **Templates gallery** (`src/templates.js`) — ＋ New opens a modal (name + 4 tiles): Blank, Document (serif notes page), Slide deck (each `<section class="slide">` is one full-viewport slide, script-free — presenter handles nav), Landing page (hero + `.feature` cards wired for the scope-picker demo). Each template uses a distinct palette/font stacks so 🎨 Colors demos well. NO template may contain a literal `</script` (the single-file trap).
