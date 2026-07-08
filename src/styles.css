@@ -146,9 +146,14 @@
   #modal .mbtns{display:flex;justify-content:flex-end;gap:8px}
 
   /* gradient editor (inspector Background) */
-  .gprev{height:26px;border-radius:7px;border:1px solid var(--border);margin-bottom:7px}
+  .gprev{height:46px;border-radius:8px;border:1px solid var(--border);margin-bottom:16px;
+    position:relative;cursor:grab}
+  .gprev:active{cursor:grabbing}
+  .gmark{position:absolute;bottom:-8px;width:15px;height:15px;border-radius:50%;
+    border:2px solid #fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.6),0 1px 4px rgba(0,0,0,.4);
+    transform:translateX(-50%);cursor:ew-resize}
+  .gmark:hover{width:17px;height:17px;bottom:-9px}
   .gstop{margin-bottom:5px}
-  .gstop .gpos{width:58px;font-size:11px;padding:4px 6px}
   .gstop .gdel{padding:2px 7px}
   .gstop .gdel[disabled]{opacity:.35;cursor:default}
   .gctl{margin-top:6px;display:flex;gap:6px}

@@ -36,6 +36,13 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
+**Added in v1.14 (July 8 2026) — draggable gradient preview:**
+- The inspector's gradient preview strip (`#iGPrev`, now 46px) IS the position editor. The `%` text inputs are gone.
+- **Stop markers** (`.gmark`) — one circle per stop, colored like its stop, hanging off the strip's bottom edge at `stopPositions(grad)[i]%`. Dragging one writes that stop's `pos` (clamped 0–100%), committing live through `applyStyle`. `stopPositions` (gradient.js) materializes auto positions the way CSS does: first 0, last 100, auto-runs spread linearly between explicit anchors; non-% units (px) fall back to interpolation and become % when dragged.
+- **Dragging the gradient surface**: linear → all stops slide together (base positions captured at mousedown, per-stop clamp 0–100); radial → the `at X% Y%` center follows the mouse (`parseAt`/`setAt` rewrite only the `at` clause of the shape string; clamp −50%..150% because real centers sit off-canvas — the Welcome hero is `at 50% 135%`).
+- Mechanics: `dragTrack` helper adds window-level mousemove/mouseup, commits on every move (serialize debounce collapses a whole drag into ONE history entry), and re-renders the inspector once on release. Marker mousedown `stopPropagation`s so it never triggers the surface drag. `updateMarkers` recomputes ALL marker lefts each move (moving one stop shifts neighboring auto stops).
+- Stop rows keep color input + ⍺ badge + ✕; color edits also live-recolor the matching marker.
+
 **Added in v1.13.1 (July 8 2026) — slideshows are explicit (supersedes v1.12's detection):**
 - The 2+-`<section>` heuristic was a false-positive machine (plain documents use `<section>`). `isDeck(html)` is replaced by **`isSlideshow(cur)`** (slides.js): true only when the shelf file has a **"slideshow" tag** (`/^slide ?show$/i` — the normal tags UI adds/removes it) OR the file's HTML contains **`data-hs-slideshow`** (an attribute on `<body>` — travels with the file through share links, downloads, and disk mode, which has no tags).
 - The **deck template opts in both ways**: `tags:['slideshow']` on the template entry (library.js passes template tags to `addFile`) + `<body data-hs-slideshow>` in its HTML.

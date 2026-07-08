@@ -6,7 +6,7 @@ import { applyAssetCache, saveDiskProject } from './disk.js';
 import { histGo, histInit, histPush, pushVersion, verKey } from './history.js';
 import { closeThemePanel } from './colors.js';
 import { openFontMenu } from './fonts.js';
-import { parseGradient, serializeGradient, normRGB, withAlpha, darken } from './gradient.js';
+import { parseGradient, serializeGradient, stopPositions, parseAt, setAt, normRGB, withAlpha, darken } from './gradient.js';
 
 /* ======================= editor ======================= */
 function setDirty(d){state.dirty=d;$('#dirtyDot').classList.toggle('show',d)}
@@ -645,11 +645,14 @@ function renderInspector(el){
         <span class="val" id="iColorV">${colHex||'transparent'}</span>
         <button id="iColorX" title="Remove override">reset</button></div></div>
     ${grad?`<div class="field"><label>Background gradient</label>
-      <div class="gprev" style="background:${esc(serializeGradient({...grad,before:'',after:''}))}"></div>
+      <div class="gprev" id="iGPrev" title="Drag a color marker to move that stop — drag the gradient itself to ${grad.type==='linear'?'slide the whole thing':'move its center'}"
+        style="background:${esc(serializeGradient({...grad,before:'',after:''}))}">
+        ${(gp=>grad.stops.map((st,i)=>{const c=normRGB(st.color)||{hex:'#000000',a:1};
+          return`<div class="gmark" data-gi="${i}" style="left:${gp[i]}%;background:${c.hex}"></div>`}).join(''))(stopPositions(grad))}
+      </div>
       <div id="iGStops">${grad.stops.map((st,i)=>{const c=normRGB(st.color)||{hex:'#000000',a:1};
         return`<div class="colorrow gstop" data-gi="${i}">
           <input type="color" value="${c.hex}">
-          <input type="text" class="gpos" value="${esc(st.pos)}" placeholder="auto" title="stop position, e.g. 40%">
           ${c.a<1?`<span class="val" title="this stop keeps its transparency">${Math.round(c.a*100)}%⍺</span>`:''}
           <button class="gdel" title="Remove stop"${grad.stops.length<=2?' disabled':''}>✕</button></div>`}).join('')}
       </div>
@@ -755,12 +758,50 @@ function renderInspector(el){
       const gi=+row.dataset.gi;
       const orig=normRGB(grad.stops[gi].color)||{hex:'#000000',a:1};
       row.querySelector('input[type=color]').oninput=e=>{
-        grad.stops[gi].color=withAlpha(e.target.value,orig.a);gCommit()};
-      row.querySelector('.gpos').onchange=e=>{
-        grad.stops[gi].pos=e.target.value.trim();gCommit()};
+        grad.stops[gi].color=withAlpha(e.target.value,orig.a);gCommit();
+        const mk=insp.querySelector(`.gmark[data-gi="${gi}"]`);if(mk)mk.style.background=e.target.value};
       row.querySelector('.gdel').onclick=()=>{
         grad.stops.splice(gi,1);gCommit();renderInspector(el)};
     });
+    /* the preview is the position editor: drag a marker to move that stop,
+       drag the gradient surface to slide everything (linear) / move the center (radial) */
+    const prevBox=$('#iGPrev');
+    const updateMarkers=()=>{const ps=stopPositions(grad);
+      prevBox.querySelectorAll('.gmark').forEach(mk=>mk.style.left=ps[+mk.dataset.gi]+'%')};
+    const dragTrack=(e,mv)=>{ /* shared mouse plumbing; rebuild once on release */
+      e.preventDefault();
+      const up=()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up);
+        renderInspector(el)};
+      addEventListener('mousemove',mv);addEventListener('mouseup',up);
+    };
+    prevBox.querySelectorAll('.gmark').forEach(mk=>{
+      mk.onmousedown=e=>{
+        e.stopPropagation();
+        const gi=+mk.dataset.gi,r=prevBox.getBoundingClientRect();
+        dragTrack(e,ev=>{
+          const p=Math.max(0,Math.min(100,Math.round((ev.clientX-r.left)/r.width*100)));
+          grad.stops[gi].pos=p+'%';gCommit();updateMarkers();
+        });
+      };
+    });
+    prevBox.onmousedown=e=>{
+      const r=prevBox.getBoundingClientRect(),x0=e.clientX,y0=e.clientY;
+      if(grad.type==='linear'){
+        const base=stopPositions(grad);
+        dragTrack(e,ev=>{
+          const d=(ev.clientX-x0)/r.width*100;
+          grad.stops.forEach((st,i)=>st.pos=Math.max(0,Math.min(100,Math.round(base[i]+d)))+'%');
+          gCommit();updateMarkers();
+        });
+      }else{
+        const at=parseAt(grad.shape);
+        dragTrack(e,ev=>{
+          const cl=v=>Math.max(-50,Math.min(150,Math.round(v))); /* centers may sit off-canvas (the hero does) */
+          grad.shape=setAt(grad.shape,cl(at.x+(ev.clientX-x0)/r.width*100),cl(at.y+(ev.clientY-y0)/r.height*100));
+          gCommit();
+        });
+      }
+    };
     $('#iGType').onchange=e=>{
       grad.type=e.target.value;
       if(grad.type==='radial'){grad.shape=grad.shape||'circle';grad.angle=''}

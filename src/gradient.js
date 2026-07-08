@@ -54,6 +54,32 @@ function serializeGradient(g){
     g.stops.map(s=>s.color+(s.pos?' '+s.pos:'')).join(', ')+')'+g.after;
 }
 
+/* materialized stop positions as % numbers — autos interpolated the way CSS does
+   (first 0, last 100, runs of autos spread linearly between explicit anchors) */
+function stopPositions(g){
+  const n=g.stops.length;
+  const out=g.stops.map(s=>{const m=/^(-?[\d.]+)%$/.exec(s.pos||'');return m?parseFloat(m[1]):null});
+  if(out[0]==null)out[0]=0;
+  if(out[n-1]==null)out[n-1]=100;
+  let i=1;
+  while(i<n){
+    if(out[i]!=null){i++;continue}
+    let j=i;while(out[j]==null)j++;
+    for(let k=i;k<j;k++)out[k]=out[i-1]+(out[j]-out[i-1])*(k-i+1)/(j-i+1);
+    i=j;
+  }
+  return out;
+}
+/* radial center: read/write the "at X% Y%" part of the shape string */
+function parseAt(shape){
+  const m=/at\s+(-?[\d.]+)%\s+(-?[\d.]+)%/.exec(shape||'');
+  return m?{x:parseFloat(m[1]),y:parseFloat(m[2])}:{x:50,y:50};
+}
+function setAt(shape,x,y){
+  shape=(shape||'circle').trim();
+  return/\bat\s/.test(shape)?shape.replace(/\bat\s.*$/,`at ${x}% ${y}%`):shape+` at ${x}% ${y}%`;
+}
+
 /* ---------- color helpers (browser does the parsing) ---------- */
 let probe=null;
 function normRGB(c){ /* any CSS color → {hex,a} — null if unparseable */
@@ -75,4 +101,4 @@ function darken(hex,f){
   return'#'+ch(hex.slice(1,3))+ch(hex.slice(3,5))+ch(hex.slice(5,7));
 }
 
-export { parseGradient, serializeGradient, normRGB, withAlpha, darken };
+export { parseGradient, serializeGradient, stopPositions, parseAt, setAt, normRGB, withAlpha, darken };
