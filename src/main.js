@@ -26,8 +26,9 @@ import { diffLines, renderDiffHTML } from './diff.js';
 import { extractHtml } from './ai.js';
 import { scanTheme, applyColorSwap, renderThemePanel, closeThemePanel, themeScan, themeBase, themeOrig, themeHist } from './colors.js';
 import { WELCOME } from './welcome.js';
+import { SLIDES_DEMO } from './slidesdemo.js';
 import { makeShareLink, shareFile, checkShareHash } from './share.js';
-import { isSlideshow, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI } from './slides.js';
+import { isSlideshow, SLIDE_LAYOUTS, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI, setDeco, parseDeco, decoCSS } from './slides.js';
 import { parseGradient, serializeGradient, normRGB } from './gradient.js';
 
 /* console/debug handle — the bundle keeps internals out of the global scope,
@@ -38,7 +39,7 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   diffLines,renderDiffHTML,extractHtml,
   scanTheme,applyColorSwap,renderThemePanel,closeThemePanel,startTour,
   makeShareLink,shareFile,checkShareHash,
-  isSlideshow,addSlide,addSlideAfterSelection,dupSlide,delSlide,moveSlide,focusSlide,refreshSlidesUI,
+  isSlideshow,SLIDE_LAYOUTS,addSlide,addSlideAfterSelection,dupSlide,delSlide,moveSlide,focusSlide,refreshSlidesUI,setDeco,parseDeco,decoCSS,
   parseGradient,serializeGradient,normRGB,
   get themeScan(){return themeScan},get themeBase(){return themeBase},
   get themeOrig(){return themeOrig},get themeHist(){return themeHist}};
@@ -68,6 +69,8 @@ window.hs={state,idb,hist,histGo,histPush,verKey,pushVersion,
   }catch{}
   if(!state.files.length&&!localStorage.getItem('hs-welcomed')){
     localStorage.setItem('hs-welcomed','1');
+    /* Slides 101 first, Welcome second — the shelf sorts by modified, Welcome should lead */
+    await addFile('Slides 101.html',SLIDES_DEMO,{tags:['slideshow','guide']});
     await addFile('Welcome to Hypershelf.html',WELCOME,{tags:['guide']});
   }
   renderLibrary();

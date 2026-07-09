@@ -6,6 +6,7 @@ import { hideModal, showModal } from './ui.js';
 import { openFile } from './editor.js';
 import { shareFile } from './share.js';
 import { WELCOME } from './welcome.js';
+import { SLIDES_DEMO } from './slidesdemo.js';
 import { TEMPLATES } from './templates.js';
 
 /* ======================= library rendering ======================= */
@@ -248,6 +249,14 @@ async function addWelcomeFile(){
   toast('Added the Welcome playground');
 }
 $('#btnWelcome').onclick=addWelcomeFile;
+/* same idea for slideshow mode — a guided deck, tagged + marked so the filmstrip lights up */
+async function addSlidesDemoFile(){
+  const f=await addFile('Slides 101.html',SLIDES_DEMO,{tags:['slideshow','guide']});
+  state.filter.disk=false;state.filter.folder=null;state.filter.tag=null;
+  renderLibrary();openFile(f.id);
+  toast('Added the Slides 101 deck');
+}
+$('#btnSlides101').onclick=addSlidesDemoFile;
 $('#btnUpload').onclick=()=>$('#fileInput').click();
 $('#fileInput').onchange=e=>{importFileList(e.target.files);e.target.value=''};
 async function importFileList(list){

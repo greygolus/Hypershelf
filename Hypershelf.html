@@ -177,6 +177,7 @@
   #slidePanel .sphead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;
     font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   #slidePanel .sphead button{padding:2px 10px;font-size:12px}
+  #slidePanel .spbtns{display:flex;gap:5px}
   #slideList{flex:1;overflow-y:auto;padding:4px 12px 14px;display:flex;flex-direction:column;gap:10px}
   .sthumb{position:relative;cursor:pointer;flex-shrink:0}
   .sthumb .twrap{width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:8px;
@@ -334,12 +335,12 @@
   input[type=range]{accent-color:var(--accent);width:100%;padding:0}
 
   /* ---------- ＋ Insert palette ---------- */
-  #insertMenu{position:fixed;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  #insertMenu,#layoutMenu{position:fixed;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:12px;
     box-shadow:0 14px 44px rgba(0,0,0,.55);width:220px;padding:5px;display:flex;flex-direction:column}
-  #insertMenu button{display:flex;align-items:center;gap:10px;background:none;border:none;
+  #insertMenu button,#layoutMenu button{display:flex;align-items:center;gap:10px;background:none;border:none;
     text-align:left;padding:8px 10px;border-radius:8px;font-size:13px}
-  #insertMenu button:hover{background:var(--panel2)}
-  #insertMenu .iic{width:20px;text-align:center}
+  #insertMenu button:hover,#layoutMenu button:hover{background:var(--panel2)}
+  #insertMenu .iic,#layoutMenu .iic{width:20px;text-align:center}
   #insertMenu .ihint{font-size:10.5px;color:var(--muted);padding:7px 10px 5px;border-top:1px solid var(--border);margin-top:4px}
 
   /* ---------- template gallery ---------- */
@@ -395,6 +396,7 @@
       </div>
       <div class="side-footer">
         <button class="ghost" id="btnWelcome" title="Add a fresh copy of the guided Welcome playground to your shelf">📚 Add example file</button>
+        <button class="ghost" id="btnSlides101" title="Add the Slides 101 example deck — a guided tour of slideshow mode">🎞 Add example slideshow</button>
         <button class="ghost" id="btnExportLib">⇩ Export library backup</button>
         <button class="ghost" id="btnImportLib">⇧ Import library backup</button>
         <button class="ghost" id="btnTheme">◐ Light / dark theme</button>
@@ -427,7 +429,7 @@
         </div>
         <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
         <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
-        <button id="btnPresent" title="Present fullscreen — ←/→ to move between slides, Esc to exit">▶</button>
+        <button id="btnPresent" title="Present fullscreen — click/→ next, ‹ › arrows, B blackout, type a number to jump, Esc to exit">▶</button>
         <button id="btnSlides" class="off" title="Slide filmstrip — jump, add, reorder slides">🎞 Slides</button>
         <select id="widthSel" title="Preview width">
           <option value="">Full width</option>
@@ -445,7 +447,9 @@
     </div>
     <div class="ed-body">
       <div id="slidePanel" class="off">
-        <div class="sphead"><span>Slides</span><button id="slideAdd" title="Add a slide after the current one">＋ Add</button></div>
+        <div class="sphead"><span>Slides</span><span class="spbtns">
+          <button id="slideDeco" title="Slide numbers &amp; footer">⚙</button>
+          <button id="slideAdd" title="Add a slide after the current one — pick a layout">＋ Add</button></span></div>
         <div id="slideList"></div>
       </div>
       <div id="frameWrap"></div>
@@ -2445,7 +2449,7 @@
       }
     }
   }
-  var PRESENT_JS = "(function(){var s=[].slice.call(document.querySelectorAll('section'));if(s.length<2)s=[].slice.call(document.body.children).filter(function(el){return !/^(SCRIPT|STYLE)$/.test(el.tagName)});if(!s.length)return;var i=0;var hud=document.createElement('div');hud.style.cssText='position:fixed;right:14px;bottom:12px;background:rgba(0,0,0,.55);color:#fff;font:12px system-ui;padding:5px 12px;border-radius:99px;z-index:2147483647;transition:opacity .5s';document.body.appendChild(hud);function go(n){i=Math.max(0,Math.min(s.length-1,n));s[i].scrollIntoView({behavior:'smooth'});hud.textContent=(i+1)+' / '+s.length+'   \\u2190 \\u2192   Esc';hud.style.opacity='1'}addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(i+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1)}else if(e.key==='Escape'){parent.postMessage('hs-exit-present','*')}});go(0);setTimeout(function(){hud.style.opacity='.35'},3000);})();";
+  var PRESENT_JS = "(function(){var s=[].slice.call(document.querySelectorAll('section'));if(s.length<2)s=[].slice.call(document.body.children).filter(function(el){return !/^(SCRIPT|STYLE)$/.test(el.tagName)});if(!s.length)return;var i=0,typed='',typedT=null;function mk(css){var d=document.createElement('div');d.style.cssText=css;document.body.appendChild(d);return d}var hud=mk('position:fixed;right:14px;bottom:16px;background:rgba(0,0,0,.55);color:#fff;font:12px system-ui;padding:5px 12px;border-radius:99px;z-index:2147483645;transition:opacity .5s;pointer-events:none');var bar=mk('position:fixed;left:0;bottom:0;height:4px;background:#54C8FF;z-index:2147483645;transition:width .25s;pointer-events:none;width:0');function arrow(txt,side,fn){var a=mk('position:fixed;'+side+':14px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font:26px/42px system-ui;text-align:center;cursor:pointer;z-index:2147483645;transition:opacity .5s;user-select:none');a.textContent=txt;a.onclick=function(e){e.stopPropagation();fn()};return a}var aL=arrow('\\u2039','left',function(){go(i-1)}),aR=arrow('\\u203a','right',function(){go(i+1)});var blk=mk('position:fixed;inset:0;background:#000;z-index:2147483647;display:none;cursor:pointer');blk.onclick=function(e){e.stopPropagation();blk.style.display='none'};var fadeT;function wake(){[hud,aL,aR].forEach(function(el){el.style.opacity='1'});clearTimeout(fadeT);fadeT=setTimeout(function(){[hud,aL,aR].forEach(function(el){el.style.opacity='.25'})},3000)}function go(n){i=Math.max(0,Math.min(s.length-1,n));s[i].scrollIntoView({behavior:'smooth'});hud.textContent=(i+1)+' / '+s.length;bar.style.width=((i+1)/s.length*100)+'%';wake()}addEventListener('mousemove',wake);document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('a,button,input,select,textarea,video,audio,[onclick]'))return;go(i+1)});addEventListener('keydown',function(e){if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(i+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1)}else if(e.key==='Home'){e.preventDefault();go(0)}else if(e.key==='End'){e.preventDefault();go(s.length-1)}else if(e.key==='b'||e.key==='B'){blk.style.display=blk.style.display==='none'?'block':'none'}else if(/^[0-9]$/.test(e.key)){typed+=e.key;hud.textContent='\\u2192 '+typed;hud.style.opacity='1';clearTimeout(typedT);typedT=setTimeout(function(){var n=parseInt(typed,10);typed='';if(n>=1&&n<=s.length)go(n-1);else go(i)},650)}else if(e.key==='Escape'){if(blk.style.display==='block')blk.style.display='none';else parent.postMessage('hs-exit-present','*')}});go(0);})();";
   $("#btnPresent").onclick = () => {
     if (!state.cur) return;
     syncNow();
@@ -3297,6 +3301,105 @@ document.querySelectorAll('.card').forEach((card, i) => {
 </body>
 </html>`;
 
+  // src/slidesdemo.js
+  var SLIDES_DEMO = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slides 101</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;color:#eceeed;background:#060a0e}
+  section.slide{min-height:100vh;display:flex;flex-direction:column;justify-content:center;
+    padding:8vh 10vw;box-sizing:border-box}
+  .slide h1{font-size:7.5vh;margin:0 0 2vh;letter-spacing:.02em}
+  .slide h2{font-size:5vh;margin:0 0 4vh;color:#54C8FF}
+  .slide p,.slide li{font-size:2.9vh;line-height:1.55;color:#b9c2cc}
+  .slide li{margin-bottom:1.8vh}
+  .slide ul{margin:0;padding-left:1.2em}
+  .slide.title{background:radial-gradient(circle at 50% 130%,rgba(84,200,255,.3),transparent 60%),#060a0e;
+    text-align:center;align-items:center}
+  .slide.accent{background:linear-gradient(160deg,#0a1420,#060a0e)}
+  .tagline{color:#54C8FF;font-size:3vh}
+  .try{display:block;margin-top:4vh;font-size:2.4vh;color:#8fa3ad}
+  .try::before{content:'▸ try it: ';color:#4cd97b;font-weight:600}
+  .k{background:#101820;border:1px solid #24455a;border-radius:8px;padding:.2vh 1.4vh;
+    font-family:ui-monospace,monospace;font-size:2.5vh;color:#eceeed;white-space:nowrap}
+  b{color:#eceeed}
+</style>
+<style data-hs-slidedeco>section{position:relative}body{counter-reset:hs-slide}section{counter-increment:hs-slide}section::after{content:counter(hs-slide)" / 7";position:absolute;right:26px;bottom:18px;font:600 13px/1 system-ui;opacity:.5;pointer-events:none}section::before{content:"Slides 101 · Hypershelf";position:absolute;left:26px;bottom:18px;font:600 13px/1 system-ui;opacity:.5;letter-spacing:.04em;pointer-events:none}</style>
+</head>
+<body data-hs-slideshow>
+
+<section class="slide title">
+  <h1>Slideshows in Hypershelf 🎞</h1>
+  <p class="tagline">A deck is just an HTML file where every &lt;section&gt; is a slide.</p>
+  <p>This one is a playground — each slide teaches one trick, and everything is safe to break.<br>
+  It works because the file is tagged <b>slideshow</b> — tag any file that way and it gets all of this.</p>
+</section>
+
+<section class="slide">
+  <h2>The filmstrip</h2>
+  <ul>
+    <li><b>Click a thumbnail</b> on the left to jump to that slide.</li>
+    <li>Hover one for per-slide tools: <b>＋</b> add after · <b>⧉</b> duplicate · <b>↑ ↓</b> reorder · <b>✕</b> delete.</li>
+    <li>Everything is one <b>Ctrl+Z</b> away — slide moves included.</li>
+  </ul>
+  <span class="try">hover this slide's thumbnail, press ⧉ to duplicate it — then ✕ the copy.</span>
+</section>
+
+<section class="slide">
+  <h2>Add slides with layouts</h2>
+  <p>The <b>＋ Add</b> button doesn't just append an empty slide — it asks what you want:</p>
+  <ul>
+    <li>🔤 Title &nbsp;·&nbsp; 📋 Bullets &nbsp;·&nbsp; 🀫 Two columns &nbsp;·&nbsp; ❝ Quote &nbsp;·&nbsp; ➖ Divider &nbsp;·&nbsp; ⬜ Blank</li>
+    <li>New slides automatically match this deck's styling.</li>
+  </ul>
+  <span class="try">hit ＋ Add in the filmstrip header and drop a ❝ Quote slide after this one.</span>
+</section>
+
+<section class="slide">
+  <h2>Numbers &amp; footer</h2>
+  <p>Look at the corners of this slide — the <b>page number</b> (bottom-right) and the
+  <b>footer line</b> (bottom-left) are stamped on every slide, and they live inside the
+  file itself, so they survive downloading and sharing.</p>
+  <p>The <b>⚙</b> button in the filmstrip header turns them on and off. The count updates
+  itself when you add or delete slides.</p>
+  <span class="try">open ⚙ and change the footer to your own name.</span>
+</section>
+
+<section class="slide">
+  <h2>Presenting</h2>
+  <p>The <b>▶</b> button (top bar) plays this deck fullscreen:</p>
+  <ul>
+    <li><span class="k">click</span> or <span class="k">→</span> next · <span class="k">←</span> back · on-screen <span class="k">‹</span> <span class="k">›</span> arrows</li>
+    <li><span class="k">B</span> blacks out the screen (press again to come back)</li>
+    <li>type a number like <span class="k">3</span> to jump straight to that slide</li>
+    <li>progress bar along the bottom · <span class="k">Esc</span> exits</li>
+  </ul>
+  <span class="try">press ▶, advance with a click, hit B, then type 1 to jump home.</span>
+</section>
+
+<section class="slide">
+  <h2>It's still just HTML</h2>
+  <ul>
+    <li>Every editor feature works here: colors, the gradient editor, drag to move, resize handles, 🤖 AI round-trips, ⌛ History.</li>
+    <li>A slide is a normal element — select one and style it in the inspector.</li>
+    <li>🔗 Share copies a link with the whole deck inside it. The link <b>is</b> the file.</li>
+  </ul>
+  <span class="try">select this slide's heading and drag a gradient onto it with ⤳ grad.</span>
+</section>
+
+<section class="slide accent">
+  <h1>Make your own</h1>
+  <p><b>＋ New → Slide deck</b> starts a fresh one, already in slideshow mode.<br>
+  Or tag any existing file <b>slideshow</b> (card ⋮ → Edit tags) and it grows a filmstrip.</p>
+  <p class="tagline">Go make something worth presenting.</p>
+</section>
+
+</body>
+</html>`;
+
   // src/templates.js
   var TEMPLATES = [
     {
@@ -3759,6 +3862,16 @@ document.querySelectorAll('.card').forEach((card, i) => {
     toast("Added the Welcome playground");
   }
   $("#btnWelcome").onclick = addWelcomeFile;
+  async function addSlidesDemoFile() {
+    const f = await addFile("Slides 101.html", SLIDES_DEMO, { tags: ["slideshow", "guide"] });
+    state.filter.disk = false;
+    state.filter.folder = null;
+    state.filter.tag = null;
+    renderLibrary();
+    openFile(f.id);
+    toast("Added the Slides 101 deck");
+  }
+  $("#btnSlides101").onclick = addSlidesDemoFile;
   $("#btnUpload").onclick = () => $("#fileInput").click();
   $("#fileInput").onchange = (e) => {
     importFileList(e.target.files);
@@ -4066,19 +4179,55 @@ document.querySelectorAll('.card').forEach((card, i) => {
     return [...doc.querySelectorAll("section")];
   }
   var activeSlide = 0;
+  var SLIDE_LAYOUTS = [
+    { ic: "🔤", name: "Title", html: "\n  <h1>Big statement</h1>\n  <p>One supporting line under it.</p>\n" },
+    { ic: "📋", name: "Bullets", html: "\n  <h2>Topic</h2>\n  <ul>\n    <li>First point</li>\n    <li>Second point</li>\n    <li>Third point</li>\n  </ul>\n" },
+    { ic: "🀫", name: "Two columns", html: '\n  <h2>Side by side</h2>\n  <div style="display:flex;gap:6vw;align-items:flex-start">\n    <div style="flex:1"><h3>Left</h3><p>First half.</p></div>\n    <div style="flex:1"><h3>Right</h3><p>Second half.</p></div>\n  </div>\n' },
+    { ic: "❝", name: "Quote", html: '\n  <blockquote style="font-size:4.5vh;line-height:1.4;margin:0;font-style:italic">&ldquo;Something worth quoting.&rdquo;</blockquote>\n  <p style="opacity:.7;margin-top:3vh">— who said it</p>\n' },
+    { ic: "➖", name: "Section divider", html: '\n  <h1 style="text-align:center">Next chapter</h1>\n' },
+    { ic: "⬜", name: "Blank", html: "\n" }
+  ];
+  var layoutMenu = null;
+  function closeLayoutMenu() {
+    if (layoutMenu) {
+      layoutMenu.remove();
+      layoutMenu = null;
+      document.removeEventListener("mousedown", onLayoutOutside, true);
+    }
+  }
+  function onLayoutOutside(e) {
+    if (layoutMenu && !layoutMenu.contains(e.target)) closeLayoutMenu();
+  }
+  function openLayoutMenu(anchor, afterIdx) {
+    closeLayoutMenu();
+    layoutMenu = document.createElement("div");
+    layoutMenu.id = "layoutMenu";
+    layoutMenu.innerHTML = SLIDE_LAYOUTS.map((l, i) => `<button data-i="${i}"><span class="iic">${l.ic}</span><span>${l.name}</span></button>`).join("");
+    document.body.appendChild(layoutMenu);
+    const r = anchor.getBoundingClientRect(), mh = layoutMenu.offsetHeight;
+    layoutMenu.style.top = (r.bottom + 6 + mh > innerHeight ? Math.max(8, r.top - mh - 6) : r.bottom + 6) + "px";
+    layoutMenu.style.left = Math.max(8, Math.min(r.left, innerWidth - 200)) + "px";
+    layoutMenu.querySelectorAll("button").forEach((b) => b.onclick = () => {
+      const l = SLIDE_LAYOUTS[+b.dataset.i];
+      closeLayoutMenu();
+      addSlide(afterIdx, l.html);
+    });
+    setTimeout(() => document.addEventListener("mousedown", onLayoutOutside, true), 0);
+  }
   function withEdit(fn) {
     if (!state.cur) return;
     if (state.mmode !== "edit") setMMode("edit");
     flushSerialize();
     if (!state.srcDoc) return;
     if (fn() === false) return;
+    syncDecoCount();
     state.cur.html = serializeSrc();
     histPush(state.cur.html);
     setDirty(true);
     renderFrame();
     refreshCodeText();
   }
-  function addSlide(afterIdx) {
+  function addSlide(afterIdx, layoutHtml) {
     withEdit(() => {
       const secs = getSlides(state.srcDoc);
       const ref = secs[Math.min(afterIdx ?? secs.length - 1, secs.length - 1)];
@@ -4087,7 +4236,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
         const sets = secs.map((x) => new Set(x.classList));
         s.className = [...sets[0]].filter((c) => sets.every((t) => t.has(c))).join(" ");
       } else s.className = "slide";
-      s.innerHTML = "\n  <h2>New slide</h2>\n  <p>Double-click any text to edit it.</p>\n";
+      s.innerHTML = layoutHtml || "\n  <h2>New slide</h2>\n  <p>Double-click any text to edit it.</p>\n";
       if (ref) ref.after(s);
       else state.srcDoc.body.appendChild(s);
       activeSlide = ref ? secs.indexOf(ref) + 1 : 0;
@@ -4098,7 +4247,62 @@ document.querySelectorAll('.card').forEach((card, i) => {
     if (state.mmode !== "edit") setMMode("edit");
     const s = srcEl(), sec = s && s.closest("section");
     const idx = sec ? getSlides(state.srcDoc).indexOf(sec) : -1;
-    addSlide(idx >= 0 ? idx : void 0);
+    openLayoutMenu($("#btnInsert"), idx >= 0 ? idx : void 0);
+  }
+  var DECO_SEL = "style[data-hs-slidedeco]";
+  function decoCSS(numbers, footer, total) {
+    let css = "section{position:relative}body{counter-reset:hs-slide}section{counter-increment:hs-slide}";
+    if (numbers) css += 'section::after{content:counter(hs-slide)" / ' + total + '";position:absolute;right:26px;bottom:18px;font:600 13px/1 system-ui;opacity:.5;pointer-events:none}';
+    if (footer) css += 'section::before{content:"' + footer.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '";position:absolute;left:26px;bottom:18px;font:600 13px/1 system-ui;opacity:.5;letter-spacing:.04em;pointer-events:none}';
+    return css;
+  }
+  function parseDeco(txt) {
+    const f = /section::before\{content:"((?:[^"\\]|\\.)*)"/.exec(txt || "");
+    return {
+      numbers: /section::after/.test(txt || ""),
+      footer: f ? f[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\") : ""
+    };
+  }
+  function syncDecoCount() {
+    const st = state.srcDoc && state.srcDoc.querySelector(DECO_SEL);
+    if (!st) return;
+    const o = parseDeco(st.textContent);
+    st.textContent = decoCSS(o.numbers, o.footer, getSlides(state.srcDoc).length);
+  }
+  function setDeco(numbers, footer) {
+    withEdit(() => {
+      const doc = state.srcDoc;
+      let st = doc.querySelector(DECO_SEL);
+      if (!numbers && !footer) {
+        if (!st) return false;
+        st.remove();
+        return;
+      }
+      if (!st) {
+        st = doc.createElement("style");
+        st.setAttribute("data-hs-slidedeco", "");
+        doc.head.appendChild(st);
+      }
+      st.textContent = decoCSS(numbers, footer, getSlides(doc).length);
+    });
+  }
+  function openDecoDialog() {
+    if (!state.cur) return;
+    if (state.mmode !== "edit") setMMode("edit");
+    flushSerialize();
+    const st = state.srcDoc && state.srcDoc.querySelector(DECO_SEL);
+    const cur = st ? parseDeco(st.textContent) : { numbers: false, footer: "" };
+    showModal(`<h3>Slide numbers &amp; footer</h3>
+    <div class="mrow"><label>Numbers</label>
+      <input type="checkbox" id="decoNum"${cur.numbers ? " checked" : ""} style="flex:none;width:auto">
+      <span style="color:var(--muted);font-size:12px">"3 / ${getSlides(state.srcDoc).length}" in the corner of every slide</span></div>
+    <div class="mrow"><label>Footer</label><input type="text" id="decoFoot" value="${esc(cur.footer)}" placeholder="e.g. Team update · July 2026 (empty = none)"></div>
+    <div class="mbtns"><button id="mCancel">Cancel</button><button class="primary" id="mOk">Apply</button></div>`);
+    $("#mCancel").onclick = hideModal;
+    $("#mOk").onclick = () => {
+      hideModal();
+      setDeco($("#decoNum").checked, $("#decoFoot").value.trim());
+    };
   }
   function dupSlide(i) {
     withEdit(() => {
@@ -4189,7 +4393,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
         const op = e.target.dataset && e.target.dataset.op;
         if (op) {
           e.stopPropagation();
-          if (op === "add") addSlide(i);
+          if (op === "add") openLayoutMenu(e.target, i);
           if (op === "dup") dupSlide(i);
           if (op === "up") moveSlide(i, -1);
           if (op === "down") moveSlide(i, 1);
@@ -4217,7 +4421,8 @@ document.querySelectorAll('.card').forEach((card, i) => {
     localStorage.setItem("hs-slides", localStorage.getItem("hs-slides") === "0" ? "1" : "0");
     refreshSlidesUI();
   };
-  $("#slideAdd").onclick = () => addSlide(activeSlide);
+  $("#slideAdd").onclick = (e) => openLayoutMenu(e.target, activeSlide);
+  $("#slideDeco").onclick = openDecoDialog;
 
   // src/insert.js
   var INSERT_ITEMS = [
@@ -4319,6 +4524,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     shareFile,
     checkShareHash,
     isSlideshow,
+    SLIDE_LAYOUTS,
     addSlide,
     addSlideAfterSelection,
     dupSlide,
@@ -4326,6 +4532,9 @@ document.querySelectorAll('.card').forEach((card, i) => {
     moveSlide,
     focusSlide,
     refreshSlidesUI,
+    setDeco,
+    parseDeco,
+    decoCSS,
     parseGradient,
     serializeGradient,
     normRGB,
@@ -4370,6 +4579,7 @@ document.querySelectorAll('.card').forEach((card, i) => {
     }
     if (!state.files.length && !localStorage.getItem("hs-welcomed")) {
       localStorage.setItem("hs-welcomed", "1");
+      await addFile("Slides 101.html", SLIDES_DEMO, { tags: ["slideshow", "guide"] });
       await addFile("Welcome to Hypershelf.html", WELCOME, { tags: ["guide"] });
     }
     renderLibrary();

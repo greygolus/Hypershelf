@@ -37,6 +37,7 @@
       </div>
       <div class="side-footer">
         <button class="ghost" id="btnWelcome" title="Add a fresh copy of the guided Welcome playground to your shelf">📚 Add example file</button>
+        <button class="ghost" id="btnSlides101" title="Add the Slides 101 example deck — a guided tour of slideshow mode">🎞 Add example slideshow</button>
         <button class="ghost" id="btnExportLib">⇩ Export library backup</button>
         <button class="ghost" id="btnImportLib">⇧ Import library backup</button>
         <button class="ghost" id="btnTheme">◐ Light / dark theme</button>
@@ -69,7 +70,7 @@
         </div>
         <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
         <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
-        <button id="btnPresent" title="Present fullscreen — ←/→ to move between slides, Esc to exit">▶</button>
+        <button id="btnPresent" title="Present fullscreen — click/→ next, ‹ › arrows, B blackout, type a number to jump, Esc to exit">▶</button>
         <button id="btnSlides" class="off" title="Slide filmstrip — jump, add, reorder slides">🎞 Slides</button>
         <select id="widthSel" title="Preview width">
           <option value="">Full width</option>
@@ -87,7 +88,9 @@
     </div>
     <div class="ed-body">
       <div id="slidePanel" class="off">
-        <div class="sphead"><span>Slides</span><button id="slideAdd" title="Add a slide after the current one">＋ Add</button></div>
+        <div class="sphead"><span>Slides</span><span class="spbtns">
+          <button id="slideDeco" title="Slide numbers &amp; footer">⚙</button>
+          <button id="slideAdd" title="Add a slide after the current one — pick a layout">＋ Add</button></span></div>
         <div id="slideList"></div>
       </div>
       <div id="frameWrap"></div>
