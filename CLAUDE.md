@@ -36,6 +36,9 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
+**Added in v1.14.1 (July 9 2026) — Edit is the default mode:**
+- New users showed the app to people who never found the mode toggle and thought the editor was read-only. Files now open in **Edit** mode, and the toggle lists **✎ Edit first (leftmost, active)** then 🖱 Interact. Changed in three places that set the initial mode (`state.js` default, `editor.js#openFile`, `disk.js#openDiskFile`) + the `#mouseModes` button order/`.active` in index.html. The Welcome playground's first two "try it" tips were reordered/reworded so the JS-button demo now says to switch to Interact first (it won't run in the default Edit mode). Existing seeded Welcome copies keep old text — re-add via 📚.
+
 **Added in v1.14 (July 8 2026) — draggable gradient preview:**
 - The inspector's gradient preview strip (`#iGPrev`, now 46px) IS the position editor. The `%` text inputs are gone.
 - **Stop markers** (`.gmark`) — one circle per stop, colored like its stop, hanging off the strip's bottom edge at `stopPositions(grad)[i]%`. Dragging one writes that stop's `pos` (clamped 0–100%), committing live through `applyStyle`. `stopPositions` (gradient.js) materializes auto positions the way CSS does: first 0, last 100, auto-runs spread linearly between explicit anchors; non-% units (px) fall back to interpolation and become % when dragged.

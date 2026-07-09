@@ -508,7 +508,7 @@ async function openDiskFile(d,f){
     /* root + diskId travel with the open file so saves and version keys hit the right folder */
     state.cur={id:null,disk:true,diskId:d.id,root:d.handle,handle:f.handle,name:f.name,html,assets,assetCache};
     state.srcDoc=null;state.selEl=null;setDirty(false);
-    state.mmode='interact';state.codeOpen=false;
+    state.mmode='edit';state.codeOpen=false; /* default to Edit — first-time users missed the toggle */
     $('#edName').value=f.name;$('#edName').readOnly=true;
     const na=Object.keys(assets).length;
     $('#edSub').textContent='💻 editing real files on disk'+(na?` · ${na} linked file${na>1?'s':''} bundled`:'');

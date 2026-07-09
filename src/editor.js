@@ -13,7 +13,7 @@ function setDirty(d){state.dirty=d;$('#dirtyDot').classList.toggle('show',d)}
 async function openFile(id){
   const f=state.files.find(x=>x.id===id);if(!f)return;
   state.cur={...f};state.srcDoc=null;state.selEl=null;setDirty(false);
-  state.mmode='interact';state.codeOpen=false;
+  state.mmode='edit';state.codeOpen=false; /* default to Edit — first-time users missed the toggle */
   $('#edName').value=f.displayName||f.name;$('#edName').readOnly=false;
   $('#edSub').textContent=f.displayName?f.name:'';
   $('#codePanel').classList.add('off');$('#codeResizer').classList.add('off');

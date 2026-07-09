@@ -30,11 +30,11 @@ export const WELCOME=`<!DOCTYPE html>
   <p>Your library + editor for self-contained HTML files. This page is a playground — everything below is safe to break.</p></div>
 <main>
   <h2 class="sec">The two mouse modes</h2>
+  <div class="tip"><b>✎ Edit</b> (the default) freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
+    <span class="try">double-click this sentence and just start typing.</span></div>
   <div class="tip"><b>🖱 Interact</b> runs the page live, scripts and all.
     <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
-    <span class="try">click the button, then switch to ✎ Edit (top bar) and notice the page holds still.</span></div>
-  <div class="tip"><b>✎ Edit</b> freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
-    <span class="try">in Edit mode, double-click this sentence and just start typing.</span></div>
+    <span class="try">switch to 🖱 Interact (top bar), click the button, then come back to ✎ Edit and notice the page holds still.</span></div>
   <div class="tip"><b>＋ Insert</b> (top bar) adds new elements — headings, buttons, lists, containers, columns, even images (embedded so the file stays self-contained).
     <span class="try">select this card, hit ＋ Insert, and add a paragraph after it.</span></div>
 
