@@ -177,7 +177,9 @@ function attachEditHandlers(doc){
   const onInlineInput=()=>{
     if(!editingEl)return;
     const s=srcEl();if(!s)return;
-    s.textContent=editingEl.textContent;
+    /* innerHTML, not textContent: mixed elements ("<b>Drag</b> — explanation…")
+       keep their child elements while the text around them is edited */
+    s.innerHTML=editingEl.innerHTML;
     const it=$('#iText');if(it)it.value=editingEl.textContent;
     scheduleSerialize();positionHandles();
   };
@@ -210,7 +212,18 @@ function attachEditHandlers(doc){
   }
   doc.body.addEventListener('dblclick',e=>{
     const t=e.target.closest('['+HS+']');
-    if(!t||t.children.length)return; /* text leaves only */
+    if(!t)return;
+    if(editingEl&&editingEl.contains(t))return; /* already editing — let dblclick word-select */
+    if(t.children.length){
+      /* mixed content (text next to child elements): editable only when the
+         double-click actually landed on a text node DIRECTLY inside t */
+      let onOwnText=false;
+      try{
+        const rng=doc.caretRangeFromPoint(e.clientX,e.clientY);
+        onOwnText=!!rng&&rng.startContainer.nodeType===3&&rng.startContainer.parentElement===t;
+      }catch{}
+      if(!onOwnText)return;
+    }
     e.preventDefault();e.stopPropagation();
     startInlineEdit(t,e);
   },true);
@@ -637,7 +650,7 @@ function renderInspector(el){
       </select></div>`:''}
     <div class="field"><label>Text</label>
       ${leaf?`<textarea id="iText">${esc(el.textContent)}</textarea>`
-        :`<div class="hint">This element contains other elements — click deeper to edit text directly.</div>`}
+        :`<div class="hint">This element contains other elements — <b>double-click any text on the page</b> to edit it in place, or click deeper to select a child.</div>`}
     </div>
     ${isec('Colors & font',`
     <div class="field"><label>Text color</label>

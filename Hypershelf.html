@@ -1443,7 +1443,7 @@
       if (!editingEl) return;
       const s = srcEl();
       if (!s) return;
-      s.textContent = editingEl.textContent;
+      s.innerHTML = editingEl.innerHTML;
       const it = $("#iText");
       if (it) it.value = editingEl.textContent;
       scheduleSerialize();
@@ -1492,7 +1492,17 @@
     }
     doc.body.addEventListener("dblclick", (e) => {
       const t = e.target.closest("[" + HS + "]");
-      if (!t || t.children.length) return;
+      if (!t) return;
+      if (editingEl && editingEl.contains(t)) return;
+      if (t.children.length) {
+        let onOwnText = false;
+        try {
+          const rng = doc.caretRangeFromPoint(e.clientX, e.clientY);
+          onOwnText = !!rng && rng.startContainer.nodeType === 3 && rng.startContainer.parentElement === t;
+        } catch {
+        }
+        if (!onOwnText) return;
+      }
       e.preventDefault();
       e.stopPropagation();
       startInlineEdit(t, e);
@@ -2029,7 +2039,7 @@
         ${scopes.map((s) => `<option value="${esc(s.sel)}">all ${esc(s.sel)} (${s.n})</option>`).join("")}
       </select></div>` : ""}
     <div class="field"><label>Text</label>
-      ${leaf ? `<textarea id="iText">${esc(el.textContent)}</textarea>` : `<div class="hint">This element contains other elements — click deeper to edit text directly.</div>`}
+      ${leaf ? `<textarea id="iText">${esc(el.textContent)}</textarea>` : `<div class="hint">This element contains other elements — <b>double-click any text on the page</b> to edit it in place, or click deeper to select a child.</div>`}
     </div>
     ${isec("Colors & font", `
     <div class="field"><label>Text color</label>
