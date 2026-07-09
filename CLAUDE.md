@@ -37,6 +37,12 @@ Hypershelf is "Google Drive + Google Docs, but for self-contained HTML files." G
 **Dev:** `npm run dev` (http-server on :8787) → open `/src/index.html` (native ES modules, no build). **Test the BUILT file** at `/Hypershelf.html` before committing.
 Cross-module mutable state goes through `state` or setter functions (e.g. `setOpenMenu`, `setCodeHighlight`) — ES module imports are read-only bindings.
 
+**Added in v1.16 (July 9 2026) — toolbar reorganized into zones (layout experiment — Grey reviewing):**
+- Bar now reads make → view → ship: `← Library · name · ↶↷ │ [✎ Edit|🖱 Interact] ‹/› Code │ ＋ Insert 🎨 Colors │ Download 🔗 Share [Save] ⋯` with a `.tsep` rule between zones. Per Grey: Code sits WITH the modes (three lenses on the same file), Download stays visible, AI goes behind ⋯.
+- **⋯ More menu** (`#btnMore`/`#moreMenu`, static markup in index.html): 🤖 AI, ⌛ History, ▶ Present, and the width `select` were MOVED into it — same element ids, so all existing wiring (ai.js, history.js, editor.js) works untouched. Click-a-button closes the menu; the width select keeps it open; outside click closes.
+- **Save button absorbs the dirty dot**: `setDirty` toggles `.dirty` on `#btnSave` — quiet/muted when clean, primary gradient + cyan glow when unsaved. `#dirtyDot` element removed.
+- **Filmstrip owns slideshow controls**: header is now `Slides · ⚙ · ＋ Add · ▶ · ‹`. `#slidePresent` proxies `#btnPresent.click()`; `‹` collapses (persists via the existing `hs-slides` key) leaving a slim `#slideTab` 🎞 strip on the left edge that reopens. `#btnSlides` toolbar button removed. Present stays reachable for ALL files via ⋯.
+
 **Added in v1.15.1 (July 9 2026) — mixed-content text is editable:**
 - **The gap**: elements mixing bare text nodes with child elements (`<div class="tip"><b>Drag to move</b> — explanation…</div>`, everywhere in the Welcome file) had NO edit path for the bare text — click selected the container ("click deeper" hint, but text nodes aren't clickable), and dblclick refused anything with `children.length`.
 - **Fix (editor.js)**: dblclick on a container now starts inline editing IF `caretRangeFromPoint` shows the click landed on a text node whose `parentElement` is the container itself (so dblclick on a container's background/gaps still does nothing, and dblclick on a `<b>` child still edits just that leaf). Guard: dblclick inside an element already being edited is left alone (native word-select).

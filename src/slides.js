@@ -225,23 +225,21 @@ function renderPanel(){
     list.appendChild(t);
   }
 }
-/* visibility: 🎞 button only for decks; panel follows the persisted toggle */
+/* visibility: filmstrip only for slideshows; collapsed = slim 🎞 tab on the left edge */
 function refreshSlidesUI(){
   const deck=isSlideshow(state.cur);
-  $('#btnSlides').classList.toggle('off',!deck);
   const show=deck&&localStorage.getItem('hs-slides')!=='0';
   $('#slidePanel').classList.toggle('off',!show);
-  $('#btnSlides').classList.toggle('primary',show);
+  $('#slideTab').classList.toggle('off',!deck||show);
   if(show)renderPanel();
 }
 const refreshSoon=debounce(refreshSlidesUI,300);
 addEventListener('hs-rendered',refreshSoon);
 addEventListener('hs-edited',refreshSoon);
 
-$('#btnSlides').onclick=()=>{
-  localStorage.setItem('hs-slides',localStorage.getItem('hs-slides')==='0'?'1':'0');
-  refreshSlidesUI();
-};
+$('#slideCollapse').onclick=()=>{localStorage.setItem('hs-slides','0');refreshSlidesUI()};
+$('#slideTab').onclick=()=>{localStorage.setItem('hs-slides','1');refreshSlidesUI()};
+$('#slidePresent').onclick=()=>$('#btnPresent').click();
 $('#slideAdd').onclick=e=>openLayoutMenu(e.target,activeSlide);
 $('#slideDeco').onclick=openDecoDialog;
 

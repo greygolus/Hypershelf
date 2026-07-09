@@ -9,7 +9,7 @@ import { openFontMenu } from './fonts.js';
 import { parseGradient, serializeGradient, stopPositions, parseAt, setAt, normRGB, withAlpha, darken } from './gradient.js';
 
 /* ======================= editor ======================= */
-function setDirty(d){state.dirty=d;$('#dirtyDot').classList.toggle('show',d)}
+function setDirty(d){state.dirty=d;$('#btnSave').classList.toggle('dirty',d)} /* Save button lights up when unsaved */
 async function openFile(id){
   const f=state.files.find(x=>x.id===id);if(!f)return;
   state.cur={...f};state.srcDoc=null;state.selEl=null;setDirty(false);
@@ -55,6 +55,24 @@ $('#edName').onchange=e=>{
   else{state.cur.name=normalizeName(v||'Untitled.html');e.target.value=state.cur.name}
   setDirty(true)};
 $('#btnDownload').onclick=()=>{syncNow();downloadFile(state.cur)};
+/* ⋯ More menu — occasional tools (AI, History, Present, width) live here */
+$('#btnMore').onclick=e=>{
+  e.stopPropagation();
+  const m=$('#moreMenu');
+  m.classList.toggle('off');
+  if(!m.classList.contains('off')){
+    const r=$('#btnMore').getBoundingClientRect();
+    m.style.top=(r.bottom+6)+'px';
+    m.style.right=Math.max(8,innerWidth-r.right)+'px';
+  }
+};
+$('#moreMenu').addEventListener('click',e=>{
+  if(e.target.tagName==='BUTTON')$('#moreMenu').classList.add('off'); /* picking a tool closes the menu; the width select stays open */
+});
+document.addEventListener('click',e=>{
+  const m=$('#moreMenu');
+  if(!m.classList.contains('off')&&!m.contains(e.target)&&e.target.id!=='btnMore')m.classList.add('off');
+});
 $('#btnSave').onclick=()=>saveCur();
 async function saveCur(){
   if(!state.cur)return;
