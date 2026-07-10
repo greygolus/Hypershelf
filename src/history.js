@@ -1,4 +1,4 @@
-import { $, $$, toast, uid } from './utils.js';
+import { $, $$, toast, uid, withAppScrollbars } from './utils.js';
 import { idb } from './db.js';
 import { state } from './state.js';
 import { applyAssetCache } from './disk.js';
@@ -64,7 +64,7 @@ $('#btnHistory').onclick=async()=>{
   $$('#modal .vprev').forEach(b=>b.onclick=()=>{
     const v=vers.find(x=>x.vid===b.dataset.vid);if(!v)return;
     const pane=$('#vPane');pane.classList.remove('asdiff');pane.innerHTML='';
-    const ifr=document.createElement('iframe');ifr.setAttribute('sandbox','');ifr.srcdoc=applyAssetCache(v.html);
+    const ifr=document.createElement('iframe');ifr.setAttribute('sandbox','');ifr.srcdoc=withAppScrollbars(applyAssetCache(v.html));
     pane.appendChild(ifr);
   });
   $$('#modal .vdiff').forEach(b=>b.onclick=()=>{

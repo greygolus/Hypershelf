@@ -44,7 +44,7 @@ export const SLIDES_DEMO=`<!DOCTYPE html>
   <h2>The filmstrip</h2>
   <ul>
     <li><b>Click a thumbnail</b> on the left to jump to that slide.</li>
-    <li>Hover one for per-slide tools: <b>＋</b> add after · <b>⧉</b> duplicate · <b>↑ ↓</b> reorder · <b>✕</b> delete.</li>
+    <li>Drag any thumbnail to reorder it. Hover one for per-slide tools: <b>＋</b> add after · <b>⧉</b> duplicate · <b>✕</b> delete.</li>
     <li>Everything is one <b>Ctrl+Z</b> away — slide moves included.</li>
   </ul>
   <span class="try">hover this slide's thumbnail, press ⧉ to duplicate it — then ✕ the copy.</span>
@@ -57,7 +57,7 @@ export const SLIDES_DEMO=`<!DOCTYPE html>
     <li>🔤 Title &nbsp;·&nbsp; 📋 Bullets &nbsp;·&nbsp; 🀫 Two columns &nbsp;·&nbsp; ❝ Quote &nbsp;·&nbsp; ➖ Divider &nbsp;·&nbsp; ⬜ Blank</li>
     <li>New slides automatically match this deck's styling.</li>
   </ul>
-  <span class="try">hit ＋ Add in the filmstrip header and drop a ❝ Quote slide after this one.</span>
+  <span class="try">hit ＋ Add slide in the filmstrip header and drop a ❝ Quote slide after this one.</span>
 </section>
 
 <section class="slide">

@@ -1,4 +1,4 @@
-import { $, $$, debounce, esc, rgbToHex, toast } from './utils.js';
+import { $, $$, debounce, esc, rgbToHex, toast, withAppScrollbars } from './utils.js';
 import { idb } from './db.js';
 import { state } from './state.js';
 import { downloadFile, normalizeName, renderLibrary } from './library.js';
@@ -9,7 +9,16 @@ import { openFontMenu } from './fonts.js';
 import { parseGradient, serializeGradient, stopPositions, parseAt, setAt, normRGB, withAlpha, darken } from './gradient.js';
 
 /* ======================= editor ======================= */
-function setDirty(d){state.dirty=d;$('#btnSave').classList.toggle('dirty',d)} /* Save button lights up when unsaved */
+function setDirty(d){
+  state.dirty=d;
+  $('#btnSave').classList.toggle('dirty',d);
+  const status=$('#saveStatus');
+  if(status){
+    status.textContent=d?'Unsaved':'Saved';
+    status.classList.toggle('dirty',d);
+    status.classList.remove('draft');
+  }
+} /* Save button and file status always agree */
 async function openFile(id){
   const f=state.files.find(x=>x.id===id);if(!f)return;
   state.cur={...f};state.srcDoc=null;state.selEl=null;setDirty(false);
@@ -17,7 +26,7 @@ async function openFile(id){
   $('#edName').value=f.displayName||f.name;$('#edName').readOnly=false;
   $('#edSub').textContent=f.displayName?f.name:'';
   $('#codePanel').classList.add('off');$('#codeResizer').classList.add('off');
-  $('#btnCode').classList.remove('primary');closeThemePanel();
+  $('#btnCode').classList.remove('primary');$('#btnCode').setAttribute('aria-pressed','false');closeThemePanel();
   $('#libView').style.display='none';$('#edView').classList.add('show');
   await offerDraftRecovery();
   $('#widthSel').value='';histInit(state.cur.html);
@@ -36,7 +45,7 @@ async function offerDraftRecovery(){
 function showLibrary(){
   /* leaving the editor is an explicit choice — the draft is no longer "crash leftovers" */
   if(state.cur)idb.del('drafts',verKey()).catch(()=>{});
-  $('#edView').classList.remove('show');$('#libView').style.display='flex';
+  $('#edView').classList.remove('show');$('#libView').style.display='';
   /* free iframe memory */
   $('#frameWrap').innerHTML='';$('#codeTa').value='';$('#codeBack').innerHTML='';
   state.cur=null;state.srcDoc=null;state.selEl=null;renderLibrary();
@@ -55,7 +64,7 @@ $('#edName').onchange=e=>{
   else{state.cur.name=normalizeName(v||'Untitled.html');e.target.value=state.cur.name}
   setDirty(true)};
 $('#btnDownload').onclick=()=>{syncNow();downloadFile(state.cur)};
-/* ⋯ More menu — occasional tools (AI, History, Present, width) live here */
+/* ⋯ More menu — occasional tools live here */
 $('#btnMore').onclick=e=>{
   e.stopPropagation();
   const m=$('#moreMenu');
@@ -67,7 +76,7 @@ $('#btnMore').onclick=e=>{
   }
 };
 $('#moreMenu').addEventListener('click',e=>{
-  if(e.target.tagName==='BUTTON')$('#moreMenu').classList.add('off'); /* picking a tool closes the menu; the width select stays open */
+  if(e.target.tagName==='BUTTON')$('#moreMenu').classList.add('off');
 });
 document.addEventListener('click',e=>{
   const m=$('#moreMenu');
@@ -113,13 +122,41 @@ function syncNow(){
 }
 
 /* ---------- mouse modes: Interact / Edit ---------- */
+function elementPath(el){
+  if(!el)return'';
+  const parts=[];let n=el;
+  while(n&&n.tagName&&parts.length<3){
+    let label=n.tagName.toLowerCase();
+    if(n.id)label+='#'+n.id;
+    else if(n.classList&&n.classList.length)label+='.'+[...n.classList].slice(0,2).join('.');
+    parts.unshift(label);n=n.parentElement;
+  }
+  return parts.join(' › ');
+}
+function updateEditorContext(){
+  const path=$('#selectionPath');if(!path)return;
+  let text='No element selected',selected=false;
+  if(state.themeOpen)text='File colors & fonts';
+  else if(state.codeOpen){text=state.selEl?'Source · '+elementPath(state.selEl):'Source editor';selected=!!state.selEl}
+  else if(state.mmode==='interact')text='Live page · scripts and links enabled';
+  else if(state.selEl){text=elementPath(state.selEl);selected=true}
+  path.textContent=text;path.classList.toggle('has-selection',selected);
+}
 function updateModeUI(){
   $$('#mouseModes button').forEach(b=>b.classList.toggle('active',b.dataset.mmode===state.mmode));
-  $('#edInspector').classList.toggle('off',state.mmode!=='edit'||state.themeOpen);
+  $('#edInspector').classList.toggle('off',state.mmode!=='edit'||state.themeOpen||state.codeOpen);
+  $('#btnCode').classList.toggle('primary',state.codeOpen);
+  $('#btnCode').setAttribute('aria-pressed',String(!!state.codeOpen));
+  updateEditorContext();
 }
 function setMMode(m){
-  if(state.mmode===m||!state.cur)return;
-  syncNow();state.mmode=m;updateModeUI();renderFrame();
+  if(!state.cur||(state.mmode===m&&!state.codeOpen&&!state.themeOpen))return;
+  syncNow();
+  if(state.codeOpen){
+    state.codeOpen=false;$('#codePanel').classList.add('off');$('#codeResizer').classList.add('off');updateFileJump();
+  }
+  if(state.themeOpen)closeThemePanel();
+  state.mmode=m;updateModeUI();renderFrame();
 }
 $$('#mouseModes button').forEach(b=>b.onclick=()=>setMMode(b.dataset.mmode));
 
@@ -127,12 +164,13 @@ $$('#mouseModes button').forEach(b=>b.onclick=()=>setMMode(b.dataset.mmode));
 const HS='data-hs-id';
 function renderFrame(){
   state.selEl=null;dispDoc=null;
+  updateEditorContext();
   const wrap=$('#frameWrap');wrap.innerHTML='';
   const fr=document.createElement('iframe');
   if(state.mmode==='interact'){
     fr.setAttribute('sandbox','allow-scripts allow-modals allow-forms allow-popups');
     wrap.appendChild(fr);
-    fr.srcdoc=applyAssetCache(state.cur.html);
+    fr.srcdoc=withAppScrollbars(applyAssetCache(state.cur.html));
   }else{
     state.srcDoc=new DOMParser().parseFromString(state.cur.html,'text/html');
     let i=0;
@@ -156,7 +194,7 @@ function renderFrame(){
     disp.head.appendChild(st);
     fr.onload=()=>attachEditHandlers(fr.contentDocument);
     wrap.appendChild(fr);
-    fr.srcdoc=applyAssetCache('<!DOCTYPE html>\n'+disp.documentElement.outerHTML);
+    fr.srcdoc=withAppScrollbars(applyAssetCache('<!DOCTYPE html>\n'+disp.documentElement.outerHTML));
     renderInspector(null);
   }
   applyPreviewWidth();
@@ -430,7 +468,7 @@ function selectDisplayEl(t,opt={}){
   doc.querySelectorAll('[data-hs-sel]').forEach(el=>el.removeAttribute('data-hs-sel'));
   t.setAttribute('data-hs-sel','');
   if(opt.scrollPage)t.scrollIntoView({block:'center'});
-  state.selEl=t;renderInspector(t);positionHandles();
+  state.selEl=t;updateEditorContext();renderInspector(t);positionHandles();
   if(state.codeOpen&&!opt.noJump)jumpToEl(t);
 }
 function srcEl(){/* the matching element in the source document */
@@ -522,13 +560,14 @@ function scopeOptions(el){
 let hlLine=-1;
 $('#btnCode').onclick=()=>{
   if(!state.cur)return;
+  if(!state.codeOpen&&state.themeOpen)closeThemePanel();
   state.codeOpen=!state.codeOpen;
   $('#codePanel').classList.toggle('off',!state.codeOpen);
   $('#codeResizer').classList.toggle('off',!state.codeOpen);
-  $('#btnCode').classList.toggle('primary',state.codeOpen);
   if(state.codeOpen){flushSerialize();$('#codeTa').value=state.cur.html;hlLine=-1;renderBackdrop();
     if(state.selEl)jumpToEl(state.selEl)}
   updateFileJump();
+  updateModeUI();
 };
 /* multi-file disk projects: dropdown to jump to a bundled css/js block in the code */
 function updateFileJump(){
@@ -623,16 +662,19 @@ function selectElementAtLine(line){
 /* ---------- inspector ---------- */
 /* section open/closed state persists for the session */
 const inspOpen={'Colors & font':true,'Spacing':true};
+let inspectorTab='content';
 const SHADOWS={subtle:'0 1px 3px rgba(0,0,0,.2)',medium:'0 4px 14px rgba(0,0,0,.25)',
   large:'0 12px 32px rgba(0,0,0,.35)',glow:'0 0 18px rgba(84,200,255,.55)'};
 function renderInspector(el){
   const insp=$('#edInspector');
-  if(!el){insp.innerHTML=`<div class="hint"><b>Click any element</b> in the page to edit it.<br><br>
+  if(!el){updateEditorContext();insp.innerHTML=`<div class="inspector-heading"><b>Inspector</b><span>Design</span></div>
+    <div class="hint"><b>Click any element</b> in the page to edit it.<br><br>
     You can change its text, colors, font, size, spacing, layout, borders, shadows, and attributes — or duplicate and delete it.<br><br>
     <b>Drag the selected element</b> to move it — <b>drag its ◢ handles</b> to resize it.<br><br>
     Scripts are paused while editing; switch the mouse to <b>Interact</b> to use the live page.<br><br>
-    Open <b>‹/› Code</b> to see the clicked element highlighted in the source.</div>`;
+    Open <b>Code</b> to see the clicked element highlighted in the source.</div>`;
     positionHandles();return}
+  updateEditorContext();
   const win=el.ownerDocument.defaultView,cs=win.getComputedStyle(el);
   const leaf=el.children.length===0;
   const desc=el.tagName.toLowerCase()+(el.id?'#'+el.id:'')+
@@ -648,7 +690,7 @@ function renderInspector(el){
     const p=prop+'-'+side,v=el.style.getPropertyValue(p).replace('px','');
     return `<input type="number" step="1" data-sp="${p}" title="${p}" value="${/^-?\d+(\.\d+)?$/.test(v)?v:''}"
       placeholder="${Math.round(parseFloat(cs.getPropertyValue(p))||0)}">`}).join('');
-  const isec=(title,body)=>`<details class="isec"${inspOpen[title]?' open':''} data-sec="${esc(title)}">
+  const isec=(title,body,tab)=>`<details class="isec"${inspOpen[title]?' open':''} data-sec="${esc(title)}" data-itab="${tab}">
     <summary>${title}</summary><div class="ibody">${body}</div></details>`;
   const isFlex=cs.display==='flex'||cs.display==='inline-flex';
   const curShadow=stv('box-shadow')||(cs.boxShadow!=='none'?cs.boxShadow:'');
@@ -657,16 +699,21 @@ function renderInspector(el){
   while(cn&&cn.getAttribute&&cn.getAttribute(HS)!==null){crumbs.unshift(cn);cn=cn.parentElement}
   const scopes=scopeOptions(el);
   const prevScope=($('#iScope')&&$('#iScope').value)||'';
+  insp.dataset.tab=inspectorTab;
   insp.innerHTML=`
+    <div class="inspector-heading"><b>Inspector</b><span>Element</span></div>
+    <div class="insp-tabs" role="tablist" aria-label="Inspector sections">
+      ${['content','style','layout','advanced'].map(tab=>`<button role="tab" data-tab="${tab}" aria-selected="${inspectorTab===tab}" class="${inspectorTab===tab?'active':''}">${tab}</button>`).join('')}
+    </div>
     <div class="crumbs">body${crumbs.map((c,i)=>' › <span class="crumb'+(i===crumbs.length-1?' cur':'')+
       '" data-hs="'+c.getAttribute(HS)+'">'+esc(c.tagName.toLowerCase()+(c.id?'#'+c.id:''))+'</span>').join('')}</div>
     <div class="insp-tag">${esc(desc)}</div>
-    ${scopes.length?`<div class="field"><label>Apply style edits to</label>
+    ${scopes.length?`<div class="field" data-itab="content"><label>Apply style edits to</label>
       <select id="iScope">
         <option value="">just this element</option>
         ${scopes.map(s=>`<option value="${esc(s.sel)}">all ${esc(s.sel)} (${s.n})</option>`).join('')}
       </select></div>`:''}
-    <div class="field"><label>Text</label>
+    <div class="field" data-itab="content"><label>Text</label>
       ${leaf?`<textarea id="iText">${esc(el.textContent)}</textarea>`
         :`<div class="hint">This element contains other elements — <b>double-click any text on the page</b> to edit it in place, or click deeper to select a child.</div>`}
     </div>
@@ -711,11 +758,11 @@ function renderInspector(el){
       <div class="sizerow"><input type="number" id="iSize" step="0.5" min="1"
           placeholder="${parseFloat(cs.fontSize)}">
         <select id="iUnit"><option>px</option><option>em</option><option>rem</option><option>%</option></select>
-        <button id="iSizeX" title="Remove override">reset</button></div></div>`)}
+        <button id="iSizeX" title="Remove override">reset</button></div></div>`,'style')}
     ${isec('Spacing',`
     <div class="field"><label>Margin (px)</label><div class="boxrow">${spRow('margin')}</div></div>
     <div class="field"><label>Padding (px)</label><div class="boxrow">${spRow('padding')}</div>
-      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>`)}
+      <div class="boxcap"><span>top</span><span>right</span><span>bottom</span><span>left</span></div></div>`,'layout')}
     ${isec('Layout & size',`
     <div class="field"><label>Width · Height (px)</label>
       <div class="boxrow"><input type="number" id="iW" value="${num(stv('width'))}" placeholder="${Math.round(parseFloat(cs.width)||0)}">
@@ -735,7 +782,7 @@ function renderInspector(el){
     <div class="field"><label>Gap (px)</label>
       <input type="number" id="iFGap" min="0" value="${num(stv('gap'))}" placeholder="${Math.round(parseFloat(cs.gap)||0)}"></div>`:''}
     <div class="field"><label>Text align</label>
-      <select id="iTAlign">${opt(['','left','center','right','justify'],stv('text-align'))}</select></div>`)}
+      <select id="iTAlign">${opt(['','left','center','right','justify'],stv('text-align'))}</select></div>`,'layout')}
     ${isec('Border & effects',`
     <div class="field"><label>Border width · style</label><div class="boxrow">
       <input type="number" id="iBW" min="0" value="${num(stv('border-width'))}" placeholder="${Math.round(parseFloat(cs.borderTopWidth)||0)}">
@@ -751,9 +798,9 @@ function renderInspector(el){
       <option value="custom"${shadowKey==='custom'?' selected':''}>custom…</option></select>
       ${shadowKey==='custom'?`<textarea id="iShadowT" style="min-height:40px;font-size:11px;margin-top:6px">${esc(curShadow)}</textarea>`:''}</div>
     <div class="field"><label>Opacity <span class="val" id="iOpaV">${Math.round((parseFloat(cs.opacity)||1)*100)}%</span></label>
-      <input type="range" id="iOpa" min="5" max="100" value="${Math.round((parseFloat(cs.opacity)||1)*100)}"></div>`)}
-    ${isec('Attributes','<div id="attrList"></div>')}
-    <div class="insp-actions">
+      <input type="range" id="iOpa" min="5" max="100" value="${Math.round((parseFloat(cs.opacity)||1)*100)}"></div>`,'style')}
+    ${isec('Attributes','<div id="attrList"></div>','advanced')}
+    <div class="insp-actions" data-itab="advanced">
       <button id="iDup">⧉ Duplicate element</button>
       <button class="danger" id="iDelete">🗑 Delete element</button>
       <button class="ghost" id="iDeselect">Deselect</button>
@@ -761,6 +808,12 @@ function renderInspector(el){
   /* keep the chosen scope when the inspector re-renders on the same element (e.g. after a reset) */
   const scopeEl=$('#iScope');
   if(scopeEl&&prevScope&&[...scopeEl.options].some(o=>o.value===prevScope))scopeEl.value=prevScope;
+  insp.querySelectorAll('.insp-tabs button').forEach(b=>b.onclick=()=>{
+    inspectorTab=b.dataset.tab;insp.dataset.tab=inspectorTab;
+    insp.querySelectorAll('.insp-tabs button').forEach(x=>{
+      x.classList.toggle('active',x===b);x.setAttribute('aria-selected',String(x===b));
+    });
+  });
   insp.querySelectorAll('details.isec').forEach(d=>d.ontoggle=()=>{inspOpen[d.dataset.sec]=d.open});
   insp.querySelectorAll('.crumb:not(.cur)').forEach(c=>c.onclick=()=>{
     const t=el.ownerDocument.querySelector(`[${HS}="${c.dataset.hs}"]`);
@@ -1013,7 +1066,7 @@ $('#btnPresent').onclick=()=>{
   const ov=document.createElement('div');ov.id='presentOv';
   const fr=document.createElement('iframe');
   fr.setAttribute('sandbox','allow-scripts allow-modals allow-forms allow-popups');
-  fr.srcdoc=html;
+  fr.srcdoc=withAppScrollbars(html);
   fr.onload=()=>{try{fr.contentWindow.focus()}catch{}};
   ov.appendChild(fr);document.body.appendChild(ov);
   const close=()=>{ov.remove();
@@ -1041,7 +1094,11 @@ $('#widthSel').onchange=applyPreviewWidth;
 function saveDraft(){
   if(!state.cur||!state.dirty)return;
   syncNow();
-  idb.put('drafts',{fileId:verKey(),ts:Date.now(),html:state.cur.html}).catch(()=>{});
+  idb.put('drafts',{fileId:verKey(),ts:Date.now(),html:state.cur.html}).then(()=>{
+    if(!state.cur||!state.dirty)return;
+    const status=$('#saveStatus');
+    status.textContent='Draft saved';status.classList.remove('dirty');status.classList.add('draft');
+  }).catch(()=>{});
 }
 setInterval(saveDraft,10000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveDraft()});
@@ -1058,4 +1115,4 @@ $('#codeResizer').onmousedown=e=>{
 };
 
 
-export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, getDispDoc, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft, insertHtmlAfterSelection };
+export { setDirty, openFile, offerDraftRecovery, showLibrary, saveCur, syncNow, updateModeUI, setMMode, updateEditorContext, HS, renderFrame, attachEditHandlers, selectDisplayEl, srcEl, getDispDoc, serializeSrc, serialT, scheduleSerialize, doSerialize, flushSerialize, applyStyle, ensureRuleSheet, parseRuleText, setScopedRule, scopeOptions, hlLine, updateFileJump, refreshCodeText, renderBackdrop, syncBackScroll, setCodeHighlight, jumpToEl, codeChanged, selectElementAtLine, renderInspector, renderAttrs, commitAttr, applyPreviewWidth, saveDraft, insertHtmlAfterSelection };

@@ -1,4 +1,4 @@
-import { $, debounce, esc } from './utils.js';
+import { $, debounce, esc, withAppScrollbars } from './utils.js';
 import { state } from './state.js';
 import { showModal, hideModal } from './ui.js';
 import { setMMode, renderFrame, flushSerialize, serializeSrc, refreshCodeText, setDirty,
@@ -17,11 +17,14 @@ import { histPush } from './history.js';
 function isSlideshow(cur){
   if(!cur)return false;
   if((cur.tags||[]).some(t=>/^slide ?show$/i.test(t)))return true;
-  return/data-hs-slideshow/.test(cur.html||'');
+  /* The marker must be on the actual body tag. A guide or code sample may
+     mention the attribute in text without being a deck itself. */
+  return/<body\b[^>]*\bdata-hs-slideshow(?:\s*=|\s|>)/i.test(cur.html||'');
 }
 function getSlides(doc){return[...doc.querySelectorAll('section')]}
 
 let activeSlide=0;
+let slideFileKey=null;
 
 /* ---------- slide layouts (add-slide picker) ---------- */
 /* inner HTML only — the <section> wrapper + deck base class come from addSlide,
@@ -154,14 +157,18 @@ function delSlide(i){
   });
   focusSlide(activeSlide);
 }
-function moveSlide(i,d){
+function reorderSlide(from,to){
+  let moved=false;
   withEdit(()=>{
     const secs=getSlides(state.srcDoc);
-    const sec=secs[i],nb=secs[i+d];if(!sec||!nb)return false;
-    d<0?nb.before(sec):nb.after(sec);activeSlide=i+d;
+    const sec=secs[from],target=secs[to];
+    if(!sec||!target||from===to)return false;
+    from<to?target.after(sec):target.before(sec);
+    activeSlide=to;moved=true;
   });
-  focusSlide(activeSlide);
+  if(moved){renderPanel();focusSlide(activeSlide)}
 }
+function moveSlide(i,d){reorderSlide(i,i+d)}
 /* scroll the editor to a slide and select it (polls — a fresh iframe may still be loading) */
 async function focusSlide(i){
   for(let t=0;t<20;t++){
@@ -190,33 +197,71 @@ function markActive(){
   $('#slideList')&&$('#slideList').querySelectorAll('.sthumb').forEach((t,i)=>
     t.classList.toggle('active',i===activeSlide));
 }
+let slidePointer=null,slideJustDropped=false;
+function clearSlideDropTargets(){
+  $('#slideList')?.querySelectorAll('.drop-before,.drop-after').forEach(t=>
+    t.classList.remove('drop-before','drop-after'));
+}
 function renderPanel(){
   const list=$('#slideList');if(!list)return;
   const html=state.cur.html;
   const n=(html.match(/<section[\s>]/gi)||[]).length;
+  $('#slideCount').textContent=n;
   if(activeSlide>=n)activeSlide=Math.max(0,n-1);
   list.innerHTML=n?'':'<div class="hint" style="padding:4px 2px">No slides yet — ＋ Add creates the first one.</div>';
   for(let i=0;i<n;i++){
     const t=document.createElement('div');t.className='sthumb'+(i===activeSlide?' active':'');
-    t.innerHTML=`<div class="twrap"></div><span class="snum">${i+1}</span>
+    t.dataset.slideIndex=i;t.tabIndex=0;
+    t.setAttribute('aria-label',`Slide ${i+1} of ${n}. Drag to reorder. Alt plus arrow keys also reorders.`);
+    t.innerHTML=`<div class="twrap"></div><span class="snum" title="Drag slide to reorder"><i>⠿</i>${i+1}</span>
       <div class="sops">
         <button data-op="add" title="Add slide after">＋</button>
         <button data-op="dup" title="Duplicate slide">⧉</button>
-        <button data-op="up" title="Move up">↑</button>
-        <button data-op="down" title="Move down">↓</button>
         <button data-op="del" title="Delete slide">✕</button>
       </div>`;
     const fr=document.createElement('iframe');
     fr.setAttribute('sandbox','');fr.loading='lazy';
-    fr.srcdoc=slideThumbHtml(html,i);
+    fr.srcdoc=withAppScrollbars(slideThumbHtml(html,i));
     t.querySelector('.twrap').appendChild(fr);
+    t.querySelectorAll('button').forEach(b=>b.draggable=false);
+    t.onpointerdown=e=>{
+      if(e.button!==0||e.target.closest('.sops'))return;
+      /* Touch users drag from the numbered handle so the rest of the thumbnail can still scroll. */
+      if(e.pointerType!=='mouse'&&!e.target.closest('.snum'))return;
+      slidePointer={id:e.pointerId,from:i,startY:e.clientY,to:i,dragging:false};
+      t.setPointerCapture(e.pointerId);
+    };
+    t.onpointermove=e=>{
+      const d=slidePointer;if(!d||d.id!==e.pointerId)return;
+      if(!d.dragging&&Math.abs(e.clientY-d.startY)<6)return;
+      d.dragging=true;e.preventDefault();t.classList.add('dragging');
+      const over=document.elementFromPoint(e.clientX,e.clientY)?.closest('.sthumb');
+      if(!over||!list.contains(over)){clearSlideDropTargets();return}
+      const overIndex=+over.dataset.slideIndex;
+      const r=over.getBoundingClientRect(),after=e.clientY>r.top+r.height/2;
+      const slot=overIndex+(after?1:0);
+      d.to=d.from<slot?slot-1:slot;
+      clearSlideDropTargets();over.classList.add(after?'drop-after':'drop-before');
+    };
+    const endPointer=e=>{
+      const d=slidePointer;if(!d||d.id!==e.pointerId)return;
+      slidePointer=null;t.classList.remove('dragging');clearSlideDropTargets();
+      if(!d.dragging)return;
+      e.preventDefault();slideJustDropped=true;setTimeout(()=>slideJustDropped=false,150);
+      if(d.to>=0&&d.to<n&&d.from!==d.to)reorderSlide(d.from,d.to);
+    };
+    t.onpointerup=endPointer;
+    t.onpointercancel=e=>{if(slidePointer?.id===e.pointerId){slidePointer=null;t.classList.remove('dragging');clearSlideDropTargets()}};
+    t.onkeydown=e=>{
+      if(!e.altKey||!['ArrowUp','ArrowDown'].includes(e.key))return;
+      e.preventDefault();moveSlide(i,e.key==='ArrowUp'?-1:1);
+    };
     t.onclick=e=>{
+      if(slideJustDropped)return;
       const op=e.target.dataset&&e.target.dataset.op;
       if(op){e.stopPropagation();
         if(op==='add')openLayoutMenu(e.target,i);
         if(op==='dup')dupSlide(i);
-        if(op==='up')moveSlide(i,-1);
-        if(op==='down')moveSlide(i,1);
         if(op==='del')delSlide(i);
         return;}
       if(state.mmode!=='edit')setMMode('edit');
@@ -228,13 +273,16 @@ function renderPanel(){
 /* visibility: filmstrip only for slideshows; collapsed = slim 🎞 tab on the left edge */
 function refreshSlidesUI(){
   const deck=isSlideshow(state.cur);
+  const fileKey=deck?(state.cur.id||state.cur.path||state.cur.name):null;
+  const freshFile=fileKey!==slideFileKey;
+  if(freshFile){activeSlide=0;slideFileKey=fileKey}
   const show=deck&&localStorage.getItem('hs-slides')!=='0';
   $('#slidePanel').classList.toggle('off',!show);
   $('#slideTab').classList.toggle('off',!deck||show);
-  if(show)renderPanel();
+  if(show){renderPanel();if(freshFile)$('#slideList').scrollTop=0}
 }
 const refreshSoon=debounce(refreshSlidesUI,300);
-addEventListener('hs-rendered',refreshSoon);
+addEventListener('hs-rendered',()=>{if(!state.cur)slideFileKey=null;refreshSoon()});
 addEventListener('hs-edited',refreshSoon);
 
 $('#slideCollapse').onclick=()=>{localStorage.setItem('hs-slides','0');refreshSlidesUI()};
@@ -243,4 +291,4 @@ $('#slidePresent').onclick=()=>$('#btnPresent').click();
 $('#slideAdd').onclick=e=>openLayoutMenu(e.target,activeSlide);
 $('#slideDeco').onclick=openDecoDialog;
 
-export { isSlideshow, SLIDE_LAYOUTS, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, focusSlide, refreshSlidesUI, setDeco, parseDeco, decoCSS };
+export { isSlideshow, SLIDE_LAYOUTS, addSlide, addSlideAfterSelection, dupSlide, delSlide, moveSlide, reorderSlide, focusSlide, refreshSlidesUI, setDeco, parseDeco, decoCSS };

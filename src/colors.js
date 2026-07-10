@@ -116,8 +116,8 @@ function renderThemePanel(){
   const t=themeScan=scanTheme(themeBase);
   const panel=$('#themePanel');
   panel.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <b style="font-size:13px">🎨 File colors &amp; fonts</b>
+    <div class="theme-heading">
+      <div><b>Theme</b><span>File colors &amp; fonts</span></div>
       <button class="ghost" id="thClose" title="Close">✕</button></div>
     <div class="throw">
       <button id="thBack" ${themeHist.length?'':'disabled'} title="Undo the last color/font change">↶ Back</button>
@@ -228,6 +228,7 @@ function closeThemePanel(){
 $('#btnColors').onclick=()=>{
   if(!state.cur)return;
   if(state.themeOpen){closeThemePanel();return}
+  if(state.codeOpen)$('#btnCode').click();
   state.themeOpen=true;
   syncNow();
   themeOrig=state.cur.html;themeHist=[];themeExpanded=-1;

@@ -29,12 +29,12 @@ export const WELCOME=`<!DOCTYPE html>
 <div class="hero"><h1>Welcome to Hypershelf 📚</h1>
   <p>Your library + editor for self-contained HTML files. This page is a playground — everything below is safe to break.</p></div>
 <main>
-  <h2 class="sec">The two mouse modes</h2>
-  <div class="tip"><b>✎ Edit</b> (the default) freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
+  <h2 class="sec">The three workspace modes</h2>
+  <div class="tip"><b>Design</b> (the default) freezes the page so you can click any element and change it in the inspector on the right — or edit text directly on the page.
     <span class="try">double-click this sentence and just start typing.</span></div>
   <div class="tip"><b>🖱 Interact</b> runs the page live, scripts and all.
     <button class="demo" onclick="this.textContent='Scripts work! ✨ Clicked '+(++window.n||(window.n=1))+'x'">Click me — I'm JavaScript</button>
-    <span class="try">switch to 🖱 Interact (top bar), click the button, then come back to ✎ Edit and notice the page holds still.</span></div>
+    <span class="try">switch to Interact in the workspace switcher, click the button, then come back to Design and notice the page holds still.</span></div>
   <div class="tip"><b>＋ Insert</b> (top bar) adds new elements — headings, buttons, lists, containers, columns, even images (embedded so the file stays self-contained).
     <span class="try">select this card, hit ＋ Insert, and add a paragraph after it.</span></div>
 
@@ -49,21 +49,21 @@ export const WELCOME=`<!DOCTYPE html>
     <span class="try">select one badge, set "Apply style edits to: all .badge (3)", then change the background — all three change.</span></div>
 
   <h2 class="sec">Styling power</h2>
-  <div class="tip"><b>Inspector sections</b> — Spacing, Layout &amp; size (display + flex controls), Border &amp; effects (shadows, corner radius, opacity), Attributes.
-    <span class="try">give the resize box a <b>glow</b> shadow from Border &amp; effects.</span></div>
-  <div class="tip"><b>🎨 Colors</b> (top bar) lists every color and font in this file with usage counts.
+  <div class="tip"><b>Inspector tabs</b> — Content for text and attributes, Style for type and color, Layout for spacing and size, and Advanced for borders, effects, and element actions.
+    <span class="try">give the resize box a <b>glow</b> shadow from the Advanced tab.</span></div>
+  <div class="tip"><b>◐ Theme</b> (top bar) lists every color and font in this file with usage counts.
     <span class="try">open it, click a swatch row, and drag the sliders — the whole page recolors live; release to apply.</span></div>
   <div class="tip"><b>Gradients</b> — select an element with a gradient background and the inspector shows every color stop, the angle, and the type, all editable. Any solid background becomes a gradient with the <b>⤳ grad</b> button.
     <span class="try">select the big banner at the top of this page — it's a radial gradient. Change its first stop.</span></div>
   <div class="tip"><b>Built-in fonts</b> — the 🅰 button offers 14 font stacks that render on any machine, no font files needed.
-    <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from 🎨 Colors.</span></div>
+    <span class="try">select this paragraph and pick "Slab Serif" — or swap the whole file's font from ◐ Theme.</span></div>
 
   <h2 class="sec">Source &amp; safety nets</h2>
   <div class="tip"><b>‹/› Code</b> shows the source side-by-side: clicking an element highlights its line, clicking a line selects the element. The panel edge drags to resize.</div>
   <div class="tip"><b>▶ Present</b> plays any file fullscreen — each &lt;section&gt; is a slide, ← → to navigate. Try the Slide deck template under ＋ New.</div>
-  <div class="tip"><b>Undo</b> (Ctrl+Z) covers everything; <b>⌛ History</b> keeps a snapshot of every Save with diffs and rollback; autosave recovers unsaved work after a crash.</div>
-  <div class="tip"><b>🤖 AI</b> copies this file plus a ready-made prompt for any AI chat — paste the reply back and review a visual diff before accepting.
-    <span class="try">click 🤖 AI, type "make the hero purple", copy, and paste it to your favorite AI.</span></div>
+  <div class="tip"><b>Undo</b> (Ctrl+Z) covers everything; <b>History</b> under More tools keeps a snapshot of every Save with diffs and rollback; autosave recovers unsaved work after a crash.</div>
+  <div class="tip"><b>AI round-trip</b> under More tools copies this file plus a ready-made prompt for any AI chat — paste the reply back and review a visual diff before accepting.
+    <span class="try">open More tools → AI round-trip, type "make the hero purple", copy, and paste it to your favorite AI.</span></div>
 
   <h2 class="sec">Real files on your computer</h2>
   <div class="tip"><b>📂 This computer</b> (sidebar) connects a real folder — sites with separate HTML/CSS/JS files open as one editable document, and one Save writes every file back.

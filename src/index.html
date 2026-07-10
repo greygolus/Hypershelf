@@ -23,17 +23,19 @@
         <button id="btnUpload">Upload</button>
         <button id="btnPaste">Paste</button>
       </div>
-      <div class="side-section">
-        <h4>Folders <button class="ghost" id="btnNewFolder" title="New folder">＋</button></h4>
-        <div class="navlist" id="folderList"></div>
-      </div>
-      <div class="side-section">
-        <h4>This computer</h4>
-        <div class="navlist" id="diskSection"></div>
-      </div>
-      <div class="side-section">
-        <h4>Tags</h4>
-        <div class="chips" id="tagChips"></div>
+      <div class="archive-filter-strip">
+        <div class="side-section">
+          <h4>Folders <button class="ghost" id="btnNewFolder" title="New folder">＋</button></h4>
+          <div class="navlist" id="folderList"></div>
+        </div>
+        <div class="side-section">
+          <h4>This computer</h4>
+          <div class="navlist" id="diskSection"></div>
+        </div>
+        <div class="side-section">
+          <h4>Tags</h4>
+          <div class="chips" id="tagChips"></div>
+        </div>
       </div>
       <div class="side-footer">
         <button class="ghost" id="btnWelcome" title="Add a fresh copy of the guided Welcome playground to your shelf">📚 Add example file</button>
@@ -46,9 +48,19 @@
     </aside>
     <main class="lib">
       <div class="lib-head">
-        <h2 id="libTitle">All files</h2>
-        <span class="meta" id="libCount"></span>
-        <input type="search" id="searchBox" placeholder="Search files…">
+        <div class="archive-summary">
+          <span class="archive-summary-label">Current collection</span>
+          <div class="archive-summary-line"><h2 id="libTitle">All files</h2><span class="meta" id="libCount"></span></div>
+        </div>
+        <div class="archive-storage" aria-live="polite">
+          <span>Browser storage</span>
+          <strong id="storageValue">Calculating…</strong>
+          <span class="archive-storage-track"><i id="storageBar"></i></span>
+        </div>
+        <label class="archive-search">
+          <span>Search the archive</span>
+          <input type="search" id="searchBox" placeholder="Search files…">
+        </label>
       </div>
       <div id="grid"></div>
     </main>
@@ -57,46 +69,69 @@
   <!-- ================= EDITOR ================= -->
   <div id="edView">
     <div class="ed-head">
-      <button id="btnBack">← Library</button>
-      <input type="text" id="edName" title="Rename">
-      <span class="ed-sub" id="edSub"></span>
-      <button class="ghost" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
-      <button class="ghost" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
-      <div class="ctools">
-        <div class="modes" id="mouseModes">
-          <button data-mmode="edit" class="active" title="Click any element to edit it">✎ Edit</button>
-          <button data-mmode="interact" title="Use the page live — scripts, buttons, and links work">🖱 Interact</button>
+      <div class="ed-file">
+        <button id="btnBack">← Library</button>
+        <div class="ed-file-meta">
+          <input type="text" id="edName" title="Rename">
+          <div class="ed-file-detail">
+            <span class="ed-sub" id="edSub"></span>
+            <span id="saveStatus" aria-live="polite">Saved</span>
+          </div>
         </div>
-        <button id="btnCode" title="Side-by-side source code view">‹/› Code</button>
-        <span class="tsep"></span>
-        <button id="btnInsert" title="Insert a new element (after the selected one)">＋ Insert</button>
-        <button id="btnColors" title="See and edit every color and font in this file">🎨 Colors</button>
       </div>
-      <button id="btnDownload">Download</button>
-      <button id="btnShare" title="Copy a link that carries this whole file inside it — no upload, the recipient gets their own copy">🔗 Share</button>
-      <button class="primary" id="btnSave" title="Save — lights up when there are unsaved changes">Save</button>
-      <button id="btnMore" title="More tools">⋯</button>
+      <div class="workspace-modes" aria-label="Workspace mode">
+        <div class="modes" id="mouseModes">
+          <button data-mmode="edit" class="active" title="Select and edit page elements">Design</button>
+          <button data-mmode="interact" title="Use the live page — scripts, buttons, and links work">Interact</button>
+        </div>
+        <button id="btnCode" aria-pressed="false" title="Open the source beside the page">‹/› Code</button>
+      </div>
+      <div class="ed-primary-actions">
+        <button class="ghost icon-btn" id="btnUndo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+        <button class="ghost icon-btn" id="btnRedo" title="Redo (Ctrl+Y)" aria-label="Redo">↷</button>
+        <button id="btnPresent" title="Present fullscreen — click/→ next, ‹ › arrows, B blackout, type a number to jump, Esc to exit">▶ Present</button>
+        <button id="btnShare" title="Copy a link that carries this whole file inside it — no upload, the recipient gets their own copy">Share</button>
+        <button class="primary" id="btnSave" title="Save (Ctrl+S)">Save</button>
+        <button id="btnMore" title="More tools" aria-label="More tools">⋯</button>
+      </div>
       <div id="moreMenu" class="off">
         <button id="btnAI" title="Round-trip this file through any AI chat">🤖 AI round-trip…</button>
         <button id="btnHistory" title="Snapshots stored on every Save">⌛ Version history…</button>
-        <button id="btnPresent" title="Present fullscreen — click/→ next, ‹ › arrows, B blackout, type a number to jump, Esc to exit">▶ Present fullscreen</button>
-        <div class="mmrow"><label>Preview width</label>
-          <select id="widthSel" title="Preview width">
-            <option value="">Full width</option>
-            <option value="1024">1024 px</option>
-            <option value="768">768 px</option>
-            <option value="390">390 px</option>
-          </select></div>
+        <button id="btnDownload">↓ Download a copy</button>
       </div>
+    </div>
+    <div class="ed-context">
+      <div class="ed-context-tools">
+        <button id="btnInsert" title="Insert a new element after the selected one">＋ Insert</button>
+        <button id="btnColors" title="Edit every color and font in this file">◐ Theme</button>
+      </div>
+      <div class="ed-selection-context" title="Current editing context">
+        <span class="context-label">Selected</span>
+        <span id="selectionPath">No element selected</span>
+      </div>
+      <label class="viewport-control">
+        <span>Viewport</span>
+        <select id="widthSel" title="Preview width">
+          <option value="">Fit</option>
+          <option value="1024">Desktop · 1024</option>
+          <option value="768">Tablet · 768</option>
+          <option value="390">Mobile · 390</option>
+        </select>
+      </label>
     </div>
     <div class="ed-body">
       <div id="slideTab" class="off" title="Show the slide filmstrip">🎞</div>
       <div id="slidePanel" class="off">
-        <div class="sphead"><span>Slides</span><span class="spbtns">
-          <button id="slideDeco" title="Slide numbers &amp; footer">⚙</button>
-          <button id="slideAdd" title="Add a slide after the current one — pick a layout">＋ Add</button>
-          <button id="slidePresent" title="Present this deck fullscreen">▶</button>
-          <button id="slideCollapse" title="Hide the filmstrip">‹</button></span></div>
+        <div class="sphead">
+          <div class="sptitle"><span>Deck</span><strong>Slides</strong><b id="slideCount">0</b></div>
+          <button class="ghost" id="slideCollapse" title="Hide the filmstrip" aria-label="Hide slide filmstrip">‹</button>
+        </div>
+        <div class="spactions">
+          <button class="primary" id="slideAdd" title="Add a slide after the current one — pick a layout">＋ Add slide</button>
+          <button id="slidePresent" title="Present this deck fullscreen" aria-label="Present deck">▶</button>
+          <button id="slideDeco" title="Slide numbers &amp; footer" aria-label="Slide numbers and footer">⚙</button>
+        </div>
+        <div class="sphelp"><span>⠿</span> Drag slides to reorder</div>
         <div id="slideList"></div>
       </div>
       <div id="frameWrap"></div>

@@ -1,4 +1,4 @@
-import { $, debounce, toast } from './utils.js';
+import { $, debounce, toast, withAppScrollbars } from './utils.js';
 import { state } from './state.js';
 import { applyAssetCache } from './disk.js';
 import { hideModal, showModal } from './ui.js';
@@ -49,7 +49,7 @@ $('#btnAI').onclick=()=>{
       body.innerHTML='<div class="prevsplit"><div><div class="plabel">Current</div></div><div><div class="plabel">AI version</div></div></div>';
       const hosts=body.querySelectorAll('.prevsplit>div');
       [[hosts[0],state.cur.html],[hosts[1],pending]].forEach(([host,html])=>{
-        const f=document.createElement('iframe');f.setAttribute('sandbox','');f.srcdoc=applyAssetCache(html);host.appendChild(f);});
+        const f=document.createElement('iframe');f.setAttribute('sandbox','');f.srcdoc=withAppScrollbars(applyAssetCache(html));host.appendChild(f);});
     }
   };
   const upd=debounce(()=>{

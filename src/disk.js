@@ -1,4 +1,4 @@
-import { $, esc, fmtDate, toast, uid } from './utils.js';
+import { $, esc, fmtDate, toast, uid, withAppScrollbars } from './utils.js';
 import { idb } from './db.js';
 import { state } from './state.js';
 import { addFile, closeMenu, downloadBlob, grid, renderLibrary, setOpenMenu } from './library.js';
@@ -426,6 +426,30 @@ async function disconnectFolder(id){
   renderLibrary();
 }
 let diskThumbObserver;
+async function renderDiskFeatured(d,f){
+  const panel=$('#archiveFeatured');if(!panel||!d||!f)return;
+  const key=d.id+':'+f.name;panel.dataset.key=key;
+  panel.querySelector('[data-feature-name]').textContent=f.name.split('/').pop();
+  panel.querySelector('[data-feature-file]').textContent=f.name;
+  panel.querySelector('[data-feature-type]').textContent='HTML document';
+  panel.querySelector('[data-feature-location]').textContent=d.name;
+  panel.querySelector('[data-feature-modified]').textContent='Loading…';
+  panel.querySelector('[data-feature-size]').textContent='Loading…';
+  panel.querySelector('.archive-feature-open').onclick=()=>openDiskFile(d,f);
+  panel.querySelector('.archive-feature-menu').onclick=e=>{e.stopPropagation();openDiskMenu(e.currentTarget,d,f)};
+  try{
+    const file=await f.handle.getFile();
+    if(panel.dataset.key!==key)return;
+    panel.querySelector('[data-feature-modified]').textContent=fmtDate(file.lastModified);
+    panel.querySelector('[data-feature-size]').textContent=file.size<1024?`${file.size} B`:`${Math.max(1,Math.round(file.size/1024))} KB`;
+    let src=await file.text();
+    try{src=(await bundleDiskHtml(d.handle,f.name,src,{withScripts:false})).html}catch{}
+    if(panel.dataset.key!==key)return;
+    const preview=panel.querySelector('.archive-preview');preview.innerHTML='';
+    const ifr=document.createElement('iframe');ifr.setAttribute('sandbox','');ifr.title=`Preview of ${f.name}`;ifr.srcdoc=withAppScrollbars(src);
+    preview.appendChild(ifr);
+  }catch{panel.querySelector('[data-feature-modified]').textContent='Unavailable'}
+}
 function renderDiskGrid(){
   const d=activeDisk();
   if(!d){state.filter.disk=false;renderLibrary();return}
@@ -440,16 +464,31 @@ function renderDiskGrid(){
       <span style="font-size:12px">Writes a small demo (html + css + js in separate files) so you can try multi-file editing.</span></div>`;
     $('#btnExample2').onclick=()=>createExampleSite(d);
     return}
-  /* disk view keeps its own thumbnail observer (the library grid has one too) */
-  grid.innerHTML=files.map((f,i)=>`
-    <div class="card" data-disk="${i}">
-      <div class="thumb"><div class="ph">‹/›</div></div>
-      <div class="card-info">
-        <div class="row1"><span class="fname" title="${esc(f.name)}">${esc(f.name)}</span>
-          <button class="menu-btn" title="Actions">⋮</button></div>
-        <div class="fmeta"><span class="fdate">on disk</span></div>
+  grid.innerHTML=`
+    <section class="archive-index" aria-label="Files in this connected folder">
+      <div class="archive-table-head" aria-hidden="true">
+        <span>No.</span><span>Document</span><span>Source</span><span>Updated</span><span></span>
       </div>
-    </div>`).join('');
+      <div class="archive-rows">${files.map((f,i)=>`
+        <div class="card" data-disk="${i}" role="button" tabindex="0" aria-label="Open ${esc(f.name)}">
+          <span class="row-index">${String(i+1).padStart(3,'0')}</span>
+          <div class="card-info"><div class="row1"><span class="fname" title="${esc(f.name)}">${esc(f.name.split('/').pop())}</span></div>
+            <div class="fmeta"><span>${esc(f.name)}</span></div></div>
+          <div class="archive-row-tags"><span class="tagpill">on disk</span></div>
+          <span class="archive-row-date fdate">Loading…</span>
+          <button class="menu-btn" title="Actions for ${esc(f.name)}" aria-label="Actions for ${esc(f.name)}">⋮</button>
+        </div>`).join('')}</div>
+    </section>
+    <aside class="archive-feature" id="archiveFeatured" aria-label="Selected disk file preview">
+      <div class="archive-feature-head"><span class="archive-feature-label">Selected document</span>
+        <div class="archive-feature-actions"><button class="archive-feature-menu">Actions</button><button class="archive-feature-open primary">Open ↗</button></div></div>
+      <div class="archive-preview"></div>
+      <div class="archive-feature-name" data-feature-name></div><div class="archive-feature-file" data-feature-file></div>
+      <div class="archive-meta-grid"><div><small>Type</small><strong data-feature-type></strong></div>
+        <div><small>Location</small><strong data-feature-location></strong></div>
+        <div><small>Modified</small><strong data-feature-modified></strong></div>
+        <div><small>Size</small><strong data-feature-size></strong></div></div>
+    </aside>`;
   if(diskThumbObserver)diskThumbObserver.disconnect();
   diskThumbObserver=new IntersectionObserver(entries=>{
     for(const en of entries){
@@ -459,16 +498,14 @@ function renderDiskGrid(){
       (async()=>{try{
         const file=await f.handle.getFile();
         en.target.querySelector('.fdate').textContent=fmtDate(file.lastModified);
-        let src=await file.text();
-        /* thumbnails get the linked css too (scripts never run in thumbs) */
-        try{src=(await bundleDiskHtml(d.handle,f.name,src,{withScripts:false})).html}catch{}
-        const ifr=document.createElement('iframe');
-        ifr.setAttribute('sandbox','');ifr.loading='lazy';ifr.srcdoc=src;
-        const th=en.target.querySelector('.thumb');th.innerHTML='';th.appendChild(ifr);
       }catch{}})();
-    }},{root:grid,rootMargin:'200px'});
+    }},{root:null,rootMargin:'200px'});
+  renderDiskFeatured(d,files[0]);
   grid.querySelectorAll('.card').forEach(card=>{
     diskThumbObserver.observe(card);
+    const show=()=>{const f=files[+card.dataset.disk];if(f)renderDiskFeatured(d,f)};
+    card.onmouseenter=show;card.onfocus=show;
+    card.onkeydown=e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();const f=files[+card.dataset.disk];if(f)openDiskFile(d,f)}};
     card.onclick=e=>{
       const f=files[+card.dataset.disk];if(!f)return;
       if(e.target.classList.contains('menu-btn')){openDiskMenu(e.target,d,f);return}
