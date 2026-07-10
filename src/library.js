@@ -1,4 +1,4 @@
-import { $, debounce, esc, fmtDate, toast, uid } from './utils.js';
+import { $, debounce, esc, fmtDate, toast, uid, withAppScrollbars } from './utils.js';
 import { idb } from './db.js';
 import { state } from './state.js';
 import { renderDiskGrid, renderDiskSection } from './disk.js';
@@ -46,7 +46,48 @@ function renderSidebar(){
     state.filter.disk=false;renderLibrary()});
 }
 let thumbObserver;
+function sizeLabel(html){
+  const bytes=new Blob([html||'']).size;
+  return bytes<1024?`${bytes} B`:`${Math.max(1,Math.round(bytes/1024))} KB`;
+}
+function storageSize(bytes){
+  if(bytes<1024)return `${Math.round(bytes)} B`;
+  if(bytes<1024**2)return `${(bytes/1024).toFixed(bytes<10240?1:0)} KB`;
+  if(bytes<1024**3)return `${(bytes/1024**2).toFixed(bytes<1024**2*10?1:0)} MB`;
+  return `${(bytes/1024**3).toFixed(1)} GB`;
+}
+async function updateStorageMeter(){
+  const value=$('#storageValue'),bar=$('#storageBar');if(!value||!bar)return;
+  const fileBytes=state.files.reduce((sum,f)=>sum+new Blob([f.html||'']).size,0);
+  try{
+    const estimate=navigator.storage&&navigator.storage.estimate?await navigator.storage.estimate():{};
+    const usage=estimate.usage??fileBytes,quota=estimate.quota||0;
+    value.textContent=quota?`${storageSize(usage)} used / ${storageSize(quota)} limit`:`${storageSize(usage)} used / browser managed`;
+    value.title=quota?'Hypershelf browser database usage / this browser\'s current per-site storage limit':'Current Hypershelf browser database usage';
+    bar.style.width=quota?Math.max(.5,Math.min(100,usage/quota*100))+'%':'1%';
+  }catch{
+    value.textContent=`${storageSize(fileBytes)} used / browser managed`;bar.style.width='1%';
+  }
+}
+function renderFeatured(f){
+  const panel=$('#archiveFeatured');if(!panel||!f)return;
+  panel.dataset.id=f.id;
+  panel.querySelector('[data-feature-name]').textContent=f.displayName||f.name;
+  panel.querySelector('[data-feature-file]').textContent=f.displayName?f.name:'Self-contained HTML document';
+  panel.querySelector('[data-feature-type]').textContent=(f.tags||[]).includes('slideshow')?'HTML slide deck':'HTML document';
+  panel.querySelector('[data-feature-location]').textContent=f.folder||'Local library';
+  panel.querySelector('[data-feature-modified]').textContent=fmtDate(f.modified);
+  panel.querySelector('[data-feature-size]').textContent=sizeLabel(f.html);
+  const preview=panel.querySelector('.archive-preview');
+  preview.innerHTML='';
+  const ifr=document.createElement('iframe');
+  ifr.setAttribute('sandbox','');ifr.title=`Preview of ${f.displayName||f.name}`;ifr.srcdoc=withAppScrollbars(f.html);
+  preview.appendChild(ifr);
+  panel.querySelector('.archive-feature-open').onclick=()=>openFile(f.id);
+  panel.querySelector('.archive-feature-menu').onclick=e=>{e.stopPropagation();openCardMenu(e.currentTarget,f.id)};
+}
 function renderGrid(){
+  updateStorageMeter();
   if(state.filter.disk){renderDiskGrid();return}
   const files=visibleFiles(),grid=$('#grid');
   $('#libTitle').textContent=state.filter.folder??'All files';
@@ -60,32 +101,48 @@ function renderGrid(){
          <span style="font-size:12px">A guided page that walks you through every editor feature.</span>`}</div>`;
     if($('#btnWelcome2'))$('#btnWelcome2').onclick=addWelcomeFile;
     return;}
-  grid.innerHTML=files.map(f=>`
-    <div class="card" data-id="${f.id}">
-      <div class="thumb"><div class="ph">‹/›</div></div>
-      <div class="card-info">
-        <div class="row1"><span class="fname" title="${esc(f.name)}">${esc(f.displayName||f.name)}</span>
-          <button class="menu-btn" title="Actions">⋮</button></div>
-        <div class="fmeta">${f.displayName?`<span class="subname">${esc(f.name)}</span>`:''}<span>${fmtDate(f.modified)}</span>
-          ${f.folder?`<span>📁 ${esc(f.folder)}</span>`:''}</div>
-        ${(f.tags||[]).length?`<div class="fmeta">${f.tags.map(t=>`<span class="tagpill">${esc(t)}</span>`).join('')}</div>`:''}
+  grid.innerHTML=`
+    <section class="archive-index" aria-label="Files in this collection">
+      <div class="archive-table-head" aria-hidden="true">
+        <span>No.</span><span>Document</span><span>Tags</span><span>Updated</span><span></span>
       </div>
-    </div>`).join('');
-  if(thumbObserver)thumbObserver.disconnect();
-  thumbObserver=new IntersectionObserver(entries=>{
-    for(const en of entries){
-      if(!en.isIntersecting)continue;
-      thumbObserver.unobserve(en.target);
-      const f=state.files.find(x=>x.id===en.target.dataset.id);
-      if(!f)continue;
-      const ifr=document.createElement('iframe');
-      ifr.setAttribute('sandbox','');ifr.loading='lazy';
-      ifr.srcdoc=f.html;
-      const th=en.target.querySelector('.thumb');
-      th.innerHTML='';th.appendChild(ifr);
-    }},{root:grid,rootMargin:'200px'});
+      <div class="archive-rows">${files.map((f,i)=>`
+        <div class="card" data-id="${f.id}" role="button" tabindex="0" aria-label="Open ${esc(f.displayName||f.name)}">
+          <span class="row-index">${String(i+1).padStart(3,'0')}</span>
+          <div class="card-info">
+            <div class="row1"><span class="fname" title="${esc(f.name)}">${esc(f.displayName||f.name)}</span></div>
+            <div class="fmeta">${f.displayName?`<span class="subname">${esc(f.name)}</span>`:''}
+              <span>${sizeLabel(f.html)}</span>${f.folder?`<span>Folder: ${esc(f.folder)}</span>`:''}</div>
+          </div>
+          <div class="archive-row-tags">${(f.tags||[]).length?f.tags.slice(0,2).map(t=>`<span class="tagpill">${esc(t)}</span>`).join(''):'<span class="tagpill">untagged</span>'}</div>
+          <span class="archive-row-date">${fmtDate(f.modified)}</span>
+          <button class="menu-btn" title="Actions for ${esc(f.displayName||f.name)}" aria-label="Actions for ${esc(f.displayName||f.name)}">⋮</button>
+        </div>`).join('')}</div>
+    </section>
+    <aside class="archive-feature" id="archiveFeatured" aria-label="Selected document preview">
+      <div class="archive-feature-head">
+        <span class="archive-feature-label">Selected document</span>
+        <div class="archive-feature-actions">
+          <button class="archive-feature-menu" title="Document actions">Actions</button>
+          <button class="archive-feature-open primary">Open ↗</button>
+        </div>
+      </div>
+      <div class="archive-preview"></div>
+      <div class="archive-feature-name" data-feature-name></div>
+      <div class="archive-feature-file" data-feature-file></div>
+      <div class="archive-meta-grid">
+        <div><small>Type</small><strong data-feature-type></strong></div>
+        <div><small>Location</small><strong data-feature-location></strong></div>
+        <div><small>Modified</small><strong data-feature-modified></strong></div>
+        <div><small>Size</small><strong data-feature-size></strong></div>
+      </div>
+    </aside>`;
+  if(thumbObserver){thumbObserver.disconnect();thumbObserver=null}
+  renderFeatured(files[0]);
   grid.querySelectorAll('.card').forEach(card=>{
-    thumbObserver.observe(card);
+    const show=()=>{const f=state.files.find(x=>x.id===card.dataset.id);if(f)renderFeatured(f)};
+    card.onmouseenter=show;card.onfocus=show;
+    card.onkeydown=e=>{if(e.target===card&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openFile(card.dataset.id)}};
     card.onclick=e=>{
       if(e.target.classList.contains('menu-btn')){openCardMenu(e.target,card.dataset.id);return}
       openFile(card.dataset.id);};

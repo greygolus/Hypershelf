@@ -1,4 +1,4 @@
-import { $, esc, toast } from './utils.js';
+import { $, esc, toast, withAppScrollbars } from './utils.js';
 import { state } from './state.js';
 import { showModal, hideModal } from './ui.js';
 import { addFile, renderLibrary } from './library.js';
@@ -78,7 +78,7 @@ async function checkShareHash(){
     <p style="margin:4px 0 12px">This link carries a copy of <b>${esc(name)}</b> (${Math.round(html.length/1024)||1} KB). Add it to your shelf?</p>
     <div class="shprev"><iframe sandbox=""></iframe></div>
     <div class="mbtns"><button id="shNo">Not now</button><button class="primary" id="shYes">＋ Add to my shelf</button></div>`,true);
-  $('.shprev iframe').srcdoc=html;
+  $('.shprev iframe').srcdoc=withAppScrollbars(html);
   $('#shNo').onclick=()=>{hideModal();clearHash()};
   $('#shYes').onclick=async()=>{
     hideModal();clearHash();
